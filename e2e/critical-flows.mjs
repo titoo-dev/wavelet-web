@@ -24,7 +24,13 @@ export async function runCriticalFlows({ browser, base, cookie, db, cronSecret, 
 
 	// F1 — home
 	await p.goto("/", 4000);
-	check("F1 home", "home renders signed in (Account + nav)", (await p.labels("^(Account|Library|Playlists)$")).length >= 3);
+	// The header stays a guest one until /auth/connect answers, and the first
+	// call logs in to Deezer with the stored ARL (~7 s cold).
+	const homeNav = await until(async () => {
+		const l = await p.labels("^(Account|Library|Playlists)$");
+		return new Set(l).size >= 3 ? l : null;
+	}, 20000);
+	check("F1 home", "home renders signed in (Account + nav)", !!homeNav, JSON.stringify(await p.labels("^(Account|Library|Playlists|Sign in)$")));
 
 	// F2 — search
 	const s = await api("GET", "/api/v1/search?term=harder%20better%20faster&type=track&nb=5");
@@ -87,12 +93,15 @@ export async function runCriticalFlows({ browser, base, cookie, db, cronSecret, 
 	await p.key("Escape");
 	await sleep(600);
 	check("F10 lyrics", "Toggle lyrics clicked", !!(await p.click("^Toggle lyrics$")));
+	// /api/* goes through the app's service worker, so the page's CDP Network
+	// events never carry these responses: read them from Resource Timing.
 	const lyr = await until(async () => {
-		const l = p.net.filter((r) => /\/api\/v1\/lyrics\//.test(r.url) && r.status);
-		return l.length ? l : null;
+		const l = await p.ev(`performance.getEntriesByType("resource").filter(e=>/\\/api\\/v1\\/lyrics\\//.test(e.name)&&e.responseStatus).map(e=>[e.name.replace(location.origin,"").slice(0,40),e.responseStatus])`);
+		return l?.length ? l : null;
 	}, 10000);
 	const lyrOpen = (await p.labels("^Close lyrics$")).length > 0;
-	check("F10 lyrics", "lyrics panel opens, lyrics fetched without server error", lyrOpen && !!lyr && lyr.every((r) => r.status < 500), `${lyrOpen} ${JSON.stringify((lyr || []).map((r) => [r.url.slice(0, 40), r.status]))}`);
+	const lyrShown = await until(() => p.ev(`/LYRICS/.test(document.body.innerText) && !/No lyrics available|Failed to fetch lyrics/.test(document.body.innerText)`), 8000);
+	check("F10 lyrics", "lyrics panel opens, lyrics fetched without server error", lyrOpen && !!lyr && lyr.every(([, s]) => s < 500) && !!lyrShown, `${lyrOpen} ${!!lyrShown} ${JSON.stringify(lyr)}`);
 	await p.click("^Close lyrics$", { tries: 3 });
 	await sleep(600);
 	check("F9 fullscreen", "Open fullscreen player clicked", !!(await p.click("^Open fullscreen player$")));
