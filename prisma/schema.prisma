@@ -79,6 +79,19 @@ model Verification {
   @@map("verification")
 }
 
+// Signing keys of the better-auth `jwt` plugin (JWTs for Convex, docs/adr/0002).
+model Jwks {
+  id         String    @id @default(cuid())
+  publicKey  String
+  privateKey String
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime?
+  alg        String?
+  crv        String?
+
+  @@map("jwks")
+}
+
 // ─── Legacy Config Table (used by Spotify plugin & global settings) ───
 
 model Config {

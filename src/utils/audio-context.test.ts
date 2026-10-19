@@ -156,6 +156,28 @@ describe("routing and volume", () => {
 		expect(audio.volume).toBeCloseTo(0.4);
 	});
 
+	it("finishes on time when the browser throttles its timer (was: a pause from another Device took ~40 s in a background tab)", async () => {
+		const audio = new Audio();
+		setElementVolume(audio, 0.8);
+		vi.useFakeTimers();
+		const realSetInterval = globalThis.setInterval;
+		// A hidden, silent tab runs intervals at most once a second.
+		const spy = vi
+			.spyOn(globalThis, "setInterval")
+			.mockImplementation(((fn: () => void) => realSetInterval(fn, 1000)) as typeof setInterval);
+		try {
+			let done = false;
+			const fade = adjustVolume(audio, 0, { duration: 500 }).then(() => (done = true));
+			await vi.advanceTimersByTimeAsync(1000);
+			expect(done).toBe(true);
+			expect(audio.volume).toBe(0);
+			await fade;
+		} finally {
+			spy.mockRestore();
+			vi.useRealTimers();
+		}
+	});
+
 	it("fades from the element's real volume when something else set element.volume (was: a preview started after a stop skipped its fade-in)", async () => {
 		const audio = new Audio();
 		setElementVolume(audio, 0.8);

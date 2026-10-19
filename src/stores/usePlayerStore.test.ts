@@ -1,8 +1,11 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 vi.mock("@/utils/haptic", () => ({ haptic: vi.fn() }));
 
 import { usePlayerStore, type PlayerTrack } from "./usePlayerStore";
+import { setRemoteSender, setRemoteVolume } from "@/lib/playback-sync/remote";
+import { toSessionTrack } from "@/lib/playback-sync/track";
+import type { Command } from "@/lib/playback-sync/types";
 
 const INITIAL = usePlayerStore.getState();
 
@@ -846,5 +849,125 @@ describe("usePlayerStore — misc setters", () => {
 		expect(saved.state.gapless).toBe(true);
 		usePlayerStore.getState().toggleGapless();
 		expect(usePlayerStore.getState().gapless).toBe(false);
+	});
+});
+
+describe("usePlayerStore — on a Remote (multi-device)", () => {
+	let sent: Command[];
+	beforeEach(() => {
+		sent = [];
+		setRemoteSender((c) => sent.push(c));
+		setRemoteVolume(null);
+		usePlayerStore.setState({ queue: makeQueue(["a", "b", "c"]), queueIndex: 1, currentTrack: makeTrack("b"), isPlaying: true, duration: 200 });
+	});
+	afterEach(() => setRemoteSender(null));
+
+	const session = (id: string) => toSessionTrack(makeTrack(id));
+
+	it("play sends the queue to the Active Device and leaves this player alone (was: the Remote played too)", () => {
+		usePlayerStore.getState().play(makeTrack("y"), makeQueue(["x", "y"]));
+		usePlayerStore.getState().play(makeTrack("z"));
+		usePlayerStore.getState().play(makeTrack("b"));
+		usePlayerStore.getState().playQueue(makeQueue(["p", "q"]), 1);
+		expect(sent).toEqual([
+			{ type: "playQueue", tracks: [session("x"), session("y")], startIndex: 1 },
+			{ type: "playQueue", tracks: [session("z")], startIndex: 0 },
+			{ type: "resume" },
+			{ type: "playQueue", tracks: [session("p"), session("q")], startIndex: 1 },
+		]);
+		expect(usePlayerStore.getState().currentTrack?.trackId).toBe("b");
+	});
+
+	it("play from a track not in the queue starts the Remote's queue at 0", () => {
+		usePlayerStore.getState().play(makeTrack("z"), makeQueue(["x", "y"]));
+		expect(sent[0]).toMatchObject({ startIndex: 0 });
+	});
+
+	it("cuts a queue longer than a window around the start track", () => {
+		const big = Array.from({ length: 1500 }, (_, i) => makeTrack(String(i)));
+		usePlayerStore.getState().playQueue(big, 1200);
+		const cmd = sent[0] as Extract<Command, { type: "playQueue" }>;
+		expect(cmd.tracks).toHaveLength(1000);
+		expect(cmd.tracks[cmd.startIndex].trackId).toBe("1200");
+	});
+
+	it("pause / resume / toggle show at once and go out as Commands", () => {
+		usePlayerStore.getState().pause();
+		expect(usePlayerStore.getState().isPlaying).toBe(false);
+		usePlayerStore.getState().toggle();
+		expect(usePlayerStore.getState().isPlaying).toBe(true);
+		usePlayerStore.getState().toggle();
+		usePlayerStore.getState().resume();
+		expect(sent).toEqual([{ type: "pause" }, { type: "resume" }, { type: "pause" }, { type: "resume" }]);
+	});
+
+	it("next / prev / prevTrack / jumpToIndex go to the Active Device", () => {
+		usePlayerStore.getState().next();
+		usePlayerStore.getState().prev();
+		usePlayerStore.getState().prevTrack();
+		usePlayerStore.setState({ queueIndex: 0 });
+		usePlayerStore.getState().prevTrack();
+		usePlayerStore.getState().jumpToIndex(2);
+		usePlayerStore.getState().jumpToIndex(9);
+		expect(sent).toEqual([{ type: "next" }, { type: "prev" }, { type: "jumpTo", index: 0 }, { type: "prev" }, { type: "jumpTo", index: 2 }]);
+		expect(usePlayerStore.getState().currentTrack?.trackId).toBe("b");
+	});
+
+	it("seek moves the shown position without asking the engine to seek", () => {
+		usePlayerStore.getState().seek(42.25);
+		expect(sent).toEqual([{ type: "seek", positionMs: 42250 }]);
+		expect(usePlayerStore.getState()).toMatchObject({ currentTime: 42.25, _seekTo: null });
+	});
+
+	it("retry does nothing: a Remote has nothing to reload", () => {
+		const before = usePlayerStore.getState()._retryLoadCount;
+		usePlayerStore.getState().retryTrack();
+		expect(usePlayerStore.getState()._retryLoadCount).toBe(before);
+		expect(sent).toEqual([]);
+	});
+
+	it("volume and mute set the Active Device's volume, not this one's", () => {
+		usePlayerStore.getState().setVolume(40);
+		setRemoteVolume(0.4);
+		usePlayerStore.getState().toggleMute();
+		setRemoteVolume(0);
+		usePlayerStore.getState().toggleMute();
+		expect(sent).toEqual([
+			{ type: "setVolume", volume: 0.4 },
+			{ type: "setVolume", volume: 0 },
+			{ type: "setVolume", volume: 0.4 },
+		]);
+		expect(usePlayerStore.getState().volume).toBe(80);
+	});
+
+	it("shuffle and repeat show at once; the Active Device does the shuffling", () => {
+		usePlayerStore.getState().toggleShuffle();
+		usePlayerStore.getState().toggleRepeat();
+		expect(sent).toEqual([{ type: "setShuffle", on: true }, { type: "setRepeat", mode: "all" }]);
+		expect(usePlayerStore.getState()).toMatchObject({ shuffle: true, repeat: "all" });
+		expect(usePlayerStore.getState().queue.map((t) => t.trackId)).toEqual(["a", "b", "c"]);
+	});
+
+	it("queue edits show at once and go out as Commands", () => {
+		usePlayerStore.getState().addNext(makeTrack("n"));
+		expect(usePlayerStore.getState().addToQueue(makeTrack("q"))).toBe(true);
+		expect(usePlayerStore.getState().addToQueue(makeTrack("q"))).toBe(false);
+		usePlayerStore.getState().moveInQueue(3, 4);
+		usePlayerStore.getState().removeFromQueue(0);
+		usePlayerStore.getState().clearQueue();
+		expect(sent).toEqual([
+			{ type: "addNext", track: session("n") },
+			{ type: "addToQueue", tracks: [session("q")] },
+			{ type: "move", from: 3, to: 4 },
+			{ type: "remove", index: 0 },
+			{ type: "clearUpcoming" },
+		]);
+		expect(usePlayerStore.getState().queue.map((t) => t.trackId)).toEqual(["b"]);
+	});
+
+	it("stop stays local (sign-out, closing the player here)", () => {
+		usePlayerStore.getState().stop();
+		expect(sent).toEqual([]);
+		expect(usePlayerStore.getState().currentTrack).toBeNull();
 	});
 });

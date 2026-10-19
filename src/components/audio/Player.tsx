@@ -29,6 +29,8 @@ import { GaplessMenuItem } from "./GaplessMenuItem";
 import { cn } from "@/lib/utils";
 import { ArtistLink } from "@/components/links/EntityLink";
 import { leavePlayer } from "./leave-player";
+import { DevicePicker, PlayingOn } from "./DevicePicker";
+import { useShownVolume } from "@/lib/playback-sync/useSyncStore";
 import { toast } from "sonner";
 
 function Tip({ label, trigger, children }: { label: string; trigger: ReactElement; children: React.ReactNode }) {
@@ -92,7 +94,7 @@ const VOLUME_STEP = 5;
 /** Volume key with its slider popping above the card (a clear gap off the top edge) instead of widening the pill.
  *  No tooltip on the key: it would open right over the slider. The wheel nudges the volume while hovering. */
 function VolumeControl() {
-	const volume = usePlayerStore((s) => s.volume);
+	const volume = useShownVolume();
 	const setVolume = usePlayerStore((s) => s.setVolume);
 	const toggleMute = usePlayerStore((s) => s.toggleMute);
 	const ref = useRef<HTMLDivElement>(null);
@@ -336,6 +338,7 @@ export function Player() {
 													)}
 												</AnimatePresence>
 												<ArtistLink id={currentTrack.artistId} name={currentTrack.artist} onClick={leavePlayer} className="truncate transition-colors hover:text-foreground" />
+												<PlayingOn className="shrink-0 before:mr-0.5 before:text-muted-foreground before:content-['·']" />
 											</p>
 										</motion.div>
 									</AnimatePresence>
@@ -489,6 +492,8 @@ export function Player() {
 										<circle cx="18.5" cy="17.5" r="1.5" />
 									</svg>
 								</Tip>
+
+								<DevicePicker className={cn(ctl, "size-9 data-popup-open:bg-foreground/[0.06] data-popup-open:text-foreground")} />
 
 								<VolumeControl />
 

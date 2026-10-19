@@ -45,6 +45,8 @@ import { useAudioLevel } from "@/hooks/useAudioLevel";
 import { cn } from "@/lib/utils";
 import { ArtistLink } from "@/components/links/EntityLink";
 import { leavePlayer } from "./leave-player";
+import { DevicePicker, PlayingOn } from "./DevicePicker";
+import { useShownVolume } from "@/lib/playback-sync/useSyncStore";
 import type { PlayerTrack } from "@/stores/usePlayerStore";
 
 function seek(time: number) {
@@ -365,7 +367,7 @@ function Controls() {
 
 /* ─── Volume (wide screens) ─── */
 function VolumeSection() {
-	const volume = usePlayerStore((s) => s.volume);
+	const volume = useShownVolume();
 	const setVolume = usePlayerStore((s) => s.setVolume);
 	const toggleMute = usePlayerStore((s) => s.toggleMute);
 	return (
@@ -481,6 +483,7 @@ function ActionPill({ lyrics, onToggleLyrics }: { lyrics: boolean; onToggleLyric
 					{upNext === 0 ? "Queue" : `${upNext} up next`}
 				</SlideSwap>
 			</button>
+			<DevicePicker className={cn(pillKey, "data-popup-open:bg-foreground/8")} />
 			{isAuthenticated && (
 				<>
 					<button
@@ -702,6 +705,7 @@ export function FullscreenPlayer() {
 							<SeekSection />
 							<Controls />
 							<VolumeSection />
+							<PlayingOn className="mb-2 justify-center self-center text-xs font-semibold" />
 							<ActionPill lyrics={lyricsVisible} onToggleLyrics={handleToggleLyrics} />
 						</div>
 					</div>

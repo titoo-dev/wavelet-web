@@ -13,6 +13,7 @@ import { AudioPreview } from "@/components/audio/AudioPreview";
 import { MiniPlayer } from "@/components/audio/MiniPlayer";
 import { AudioEngine } from "@/components/audio/AudioEngine";
 import { AudioEngineErrorBoundary } from "@/components/audio/AudioEngineErrorBoundary";
+import { PlaybackSyncMount } from "@/components/audio/PlaybackSyncMount";
 import { Player } from "@/components/audio/Player";
 import { FullscreenPlayer } from "@/components/audio/FullscreenPlayer";
 import { QueuePanel } from "@/components/audio/QueuePanel";
@@ -49,6 +50,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 				<AudioEngineErrorBoundary>
 					<AudioEngine />
 				</AudioEngineErrorBoundary>
+				<PlaybackSyncMount />
 				<BehindOverlays>
 					<MiniPlayer />
 					<Player />

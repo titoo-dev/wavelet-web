@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useCallback, useState } from "react";
 import { currentLoginHref } from "@/lib/login-redirect";
 import { usePlayerStore, type PlayerTrack } from "@/stores/usePlayerStore";
 import { usePreviewStore } from "@/stores/usePreviewStore";
+import { useSyncStore } from "@/lib/playback-sync/useSyncStore";
 import { adjustVolume } from "@/utils/adjust-volume";
 import {
 	initAudioCtx,
@@ -173,8 +174,14 @@ export function AudioEngine() {
 	// session restore). Cleared after use or on a different track-change.
 	const resumePositionRef = useRef<number | null>(null);
 
-	const currentTrack = usePlayerStore((s) => s.currentTrack);
-	const isPlaying = usePlayerStore((s) => s.isPlaying);
+	// A Remote outputs no sound (CONTEXT.md, Remote): the engine sees no track while another
+	// Device plays, so it unloads, and loads the session's track again once this tab is active.
+	const remote = useSyncStore((s) => s.role === "remote");
+	const remoteRef = useRef(remote);
+	const storeTrack = usePlayerStore((s) => s.currentTrack);
+	const storeIsPlaying = usePlayerStore((s) => s.isPlaying);
+	const currentTrack = remote ? null : storeTrack;
+	const isPlaying = remote ? false : storeIsPlaying;
 	const volume = usePlayerStore((s) => s.volume);
 	const repeat = usePlayerStore((s) => s.repeat);
 	const setCurrentTime = usePlayerStore((s) => s.setCurrentTime);
@@ -470,6 +477,16 @@ export function AudioEngine() {
 			// Corrupt entry — ignore
 		}
 	}, []);
+
+	// Remote → active (a Transfer here): start the session's track where the session is. Runs
+	// before the load effect below, which picks resumePositionRef up.
+	useLayoutEffect(() => {
+		const was = remoteRef.current;
+		remoteRef.current = remote;
+		if (!was || remote) return;
+		const time = usePlayerStore.getState().currentTime;
+		resumePositionRef.current = isFinite(time) && time >= 1 ? time : null;
+	}, [remote]);
 
 	// Save current position on pagehide / tab hide so we can resume on refresh.
 	// pagehide fires reliably on close + bfcache; visibilitychange catches
@@ -780,6 +797,13 @@ export function AudioEngine() {
 
 	// Pause (not stop) stream player when preview starts; resume when preview ends
 	useEffect(() => {
+		if (remote) {
+			// A Preview on a Remote pauses the Active Device, which stays paused when it ends
+			// (CONTEXT.md, Preview): the pause goes out as a Command.
+			if (previewTrack && previewIsPlaying && usePlayerStore.getState().isPlaying) usePlayerStore.getState().pause();
+			usePreviewStore.getState().setMainWasPlaying(false);
+			return;
+		}
 		if (previewTrack && previewIsPlaying) {
 			const { isPlaying: mainPlaying } = usePlayerStore.getState();
 			usePreviewStore.getState().setMainWasPlaying(mainPlaying);
@@ -800,7 +824,7 @@ export function AudioEngine() {
 			}
 			usePreviewStore.getState().setMainWasPlaying(false);
 		}
-	}, [previewTrack, previewIsPlaying]);
+	}, [previewTrack, previewIsPlaying, remote]);
 
 	// --- Preload adjacent tracks + smart background prefetch ---
 	useEffect(() => {
@@ -840,8 +864,9 @@ export function AudioEngine() {
 
 		if (!currentTrack) {
 			// Stopping playback (queue cleared / explicit stop). If the last
-			// track wasn't counted, it's a skip.
-			if (shouldNotifySkip(sessionRef.current)) notifyTrackSkipped(sessionRef.current.trackId);
+			// track wasn't counted, it's a skip — unless the sound just moved to
+			// another Device (was: a Transfer counted as a skip and evicted the track).
+			if (!remoteRef.current && shouldNotifySkip(sessionRef.current)) notifyTrackSkipped(sessionRef.current.trackId);
 			sessionRef.current = null;
 			// Nothing started for the stopped track may land afterwards: a URL
 			// still resolving, a seek waiting for the stored file, a resume
