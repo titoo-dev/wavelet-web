@@ -1,0 +1,3 @@
+# Convex trusts short-lived JWTs from our better-auth, not its own Better Auth component
+
+better-auth stays in Next.js on Prisma (ADR 0001). Its `jwt` plugin publishes a JWKS at `/api/auth/jwks` and mints short-lived JWTs (subject = `userId`); Convex verifies them through a `customJwt` provider in `convex/auth.config.ts`. Web and mobile trade their existing session (cookie, or bearer on mobile) for a JWT and refresh it before it expires. We did not adopt Convex's Better Auth component, which runs better-auth inside Convex, because it would move accounts and sessions out of Postgres and off the tested auth surface. Clients talk to Convex directly rather than through a Next.js proxy, so they keep live subscriptions.

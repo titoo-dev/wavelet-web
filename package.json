@@ -19,7 +19,8 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
-    "e2e": "node e2e/run.mjs"
+    "e2e": "node e2e/run.mjs",
+    "e2e:devices": "node e2e/multi-device.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
@@ -35,6 +36,7 @@
     "browser-id3-writer": "^6.3.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "convex": "^1.47.0",
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.6.0",
     "got": "^14.6.6",
@@ -58,6 +60,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@edge-runtime/vm": "^5.0.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.2",
@@ -71,8 +74,10 @@
     "@types/uuid": "^10.0.0",
     "@vitest/coverage-v8": "4.1.5",
     "@vitest/ui": "4.1.5",
+    "convex-test": "^0.0.62",
     "eslint": "^9",
     "eslint-config-next": "16.2.1",
+    "jose": "^6.2.12",
     "jsdom": "29.1.1",
     "sharp": "^0.34.5",
     "tailwindcss": "^4",

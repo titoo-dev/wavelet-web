@@ -16,6 +16,16 @@ Wavelet tourne entièrement dans Next.js (pages + routes `src/app/api/v1/`), san
 4. **Settings → Environment Variables** : ajouter `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` (l'URL de production), `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, et si besoin `WAVELET_SERVICE_ARL`, `SPOTIFY_CLIENT_ID` et `SPOTIFY_CLIENT_SECRET` (voir `.env.example`). Recommandé : `WAVELET_ENCRYPTION_KEY` (chiffrement des ARL — **la même valeur en Production et en Preview** si elles partagent la base), `WAVELET_ADMIN_EMAILS` (qui peut changer la qualité serveur) et `CRON_SECRET` (nettoyage quotidien du stockage).
 5. Dans la console Google OAuth, ajouter `https://<domaine>/api/auth/callback/google` aux redirect URIs.
 
+## Lecture multi-appareils (Convex)
+
+La Playback Session, les Devices et les Commands vivent sur Convex (`convex/`, docs/adr/0001) ; sans `NEXT_PUBLIC_CONVEX_URL`, chaque onglet joue seul comme avant.
+
+1. Créer le projet Convex : `npx convex login`, puis `npx convex deploy` (déploiement de production). Noter l'URL `https://<nom>.convex.cloud`.
+2. Sur le déploiement Convex : `npx convex env set BETTER_AUTH_URL https://wavelet.titosy.dev --prod`. Convex vérifie les JWT avec les clés de `${BETTER_AUTH_URL}/api/auth/jwks` (docs/adr/0002) ; l'`iss` doit être exactement cette URL.
+3. Dans Vercel : `NEXT_PUBLIC_CONVEX_URL` (l'URL du déploiement, lue au build), et `CONVEX_DEPLOY_KEY` (Convex → Settings → Deploy key) pour redéployer les fonctions : `npx convex deploy` à chaque changement de `convex/` (à la main, ou en remplaçant la commande de build Vercel par `npx convex deploy --cmd 'npm run vercel-build'`).
+4. La migration `jwks` (clés de signature du plugin `jwt`) part avec le prochain build, comme les autres.
+5. Mobile : `WAVELET_CONVEX_URL` dans `env/prod.env` de l'app Flutter.
+
 ## 2. Schéma de la base
 
 Le schéma est géré par des migrations Prisma (`prisma/migrations/`). Le build Vercel (`vercel.json` → `npm run vercel-build`) lance `prisma migrate deploy` avant `next build`, sur la connexion directe `DATABASE_URL_UNPOOLED` (le pooler Neon ne supporte pas les verrous de migration). Rien à faire à la main.

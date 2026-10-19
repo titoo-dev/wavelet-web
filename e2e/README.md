@@ -52,3 +52,12 @@ Env: `E2E_PORT`, `E2E_PG_PORT`, `E2E_SKIP_BUILD=1` (reuse `.next`), `E2E_KEEP=1`
 - Pause through the UI, not `element.pause()`, which desyncs the store.
 - A second tab backgrounds the first. Close it and call `front()` on the main page.
 - Headless Chrome stalls blob downloads to disk, so check the blob the app creates (`window.__blobs` / `window.__saves`).
+
+## Multi-device suite
+
+`npm run e2e:devices` (`e2e/multi-device.mjs`) opens two signed-in tabs on one Playback Session: a Remote that stays silent and controls the Active Device (pause, play, next), a Transfer that carries on from the same position, a paused session that stays paused through a Transfer, and the Active Device going away (paused, no Active Device, Play elsewhere takes over).
+
+- Needs Docker, Chrome and the Convex deployment of `.env.local`: `CONVEX_AGENT_MODE=anonymous npx convex dev` running, with `npx convex env set BETTER_AUTH_URL http://localhost:3000` (Convex fetches the JWT keys from the app).
+- No Deezer or R2: the browser answers the stream routes with a silent MP3 that serves byte ranges, every track "stored". The tabs bypass the Service Worker, which would otherwise fetch the streams out of reach of that stub.
+- A new user per run: the Convex deployment keeps the previous run's session.
+- The device picker's item is picked with `element.click()`: a synthetic mouse click can land while the popup still animates in.

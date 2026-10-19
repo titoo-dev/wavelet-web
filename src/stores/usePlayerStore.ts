@@ -1,6 +1,9 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { haptic } from "@/utils/haptic";
+import { isRemote, muteToggleCommand, sendIfRemote } from "@/lib/playback-sync/remote";
+import { MAX_QUEUE, toSessionTrack, windowStartFor } from "@/lib/playback-sync/track";
+import type { Command } from "@/lib/playback-sync/types";
 
 export interface PlayerTrack {
 	trackId: string;
@@ -132,6 +135,19 @@ function shuffleAround(queue: PlayerTrack[], startIndex: number): PlayerTrack[] 
 	return [start, ...shuffleArray(rest)];
 }
 
+/**
+ * A Remote's "play this queue from there" as a Command. The Active Device applies its own
+ * shuffle to it; a queue longer than a window is cut around the start track.
+ */
+function playQueueCommand(queue: PlayerTrack[], startIndex: number): Command {
+	const from = windowStartFor(queue.length, startIndex);
+	return {
+		type: "playQueue",
+		tracks: queue.slice(from, from + MAX_QUEUE).map(toSessionTrack),
+		startIndex: startIndex - from,
+	};
+}
+
 export const usePlayerStore = create<PlayerState>()(
 	persist(
 		(set, get) => ({
@@ -159,6 +175,18 @@ export const usePlayerStore = create<PlayerState>()(
 			play: (track, queue) => {
 				const state = get();
 				const isSameTrack = state.currentTrack?.trackId === track.trackId;
+				// A Remote plays on the Active Device (CONTEXT.md, Remote).
+				if (
+					sendIfRemote(() => {
+						if (queue) {
+							const idx = queue.findIndex((t) => t.trackId === track.trackId);
+							return playQueueCommand(queue, idx >= 0 ? idx : 0);
+						}
+						return isSameTrack ? { type: "resume" } : playQueueCommand([track], 0);
+					})
+				) {
+					return;
+				}
 				if (queue) {
 					const idx = queue.findIndex((t) => t.trackId === track.trackId);
 					const startIdx = idx >= 0 ? idx : 0;
@@ -199,10 +227,18 @@ export const usePlayerStore = create<PlayerState>()(
 				}
 			},
 
-			pause: () => set({ isPlaying: false }),
-			resume: () => set({ isPlaying: true }),
+			// On a Remote, transport changes show at once and the Active Device's publish confirms them.
+			pause: () => {
+				sendIfRemote({ type: "pause" });
+				set({ isPlaying: false });
+			},
+			resume: () => {
+				sendIfRemote({ type: "resume" });
+				set({ isPlaying: true });
+			},
 			toggle: () => {
 				haptic(8);
+				sendIfRemote(() => ({ type: get().isPlaying ? "pause" : "resume" }));
 				set((s) => ({ isPlaying: !s.isPlaying }));
 			},
 			stop: () => set({
@@ -213,6 +249,7 @@ export const usePlayerStore = create<PlayerState>()(
 			}),
 
 			next: () => {
+				if (sendIfRemote({ type: "next" })) return;
 				const { queue, queueIndex, shuffle, repeat } = get();
 				if (queue.length === 0) return;
 
@@ -240,6 +277,7 @@ export const usePlayerStore = create<PlayerState>()(
 			},
 
 			prev: () => {
+				if (sendIfRemote({ type: "prev" })) return;
 				const { queue, queueIndex, currentTime, repeat } = get();
 				if (queue.length === 0) return;
 
@@ -264,6 +302,7 @@ export const usePlayerStore = create<PlayerState>()(
 			prevTrack: () => {
 				const { queue, queueIndex, repeat } = get();
 				if (queue.length === 0) return;
+				if (sendIfRemote(queueIndex > 0 ? { type: "jumpTo", index: queueIndex - 1 } : { type: "prev" })) return;
 
 				if (queueIndex === 0) {
 					if (repeat === "all") {
@@ -280,9 +319,16 @@ export const usePlayerStore = create<PlayerState>()(
 			seek: (time) => {
 				const { duration } = get();
 				const clamped = Math.max(0, duration > 0 ? Math.min(time, duration) : time);
+				// A Remote has nothing to seek: the Active Device does, and its position shows here.
+				if (sendIfRemote({ type: "seek", positionMs: Math.round(clamped * 1000) })) {
+					set({ currentTime: clamped });
+					return;
+				}
 				set({ currentTime: clamped, _seekTo: clamped });
 			},
 			retryTrack: () => {
+				// A Remote plays nothing, so it has nothing to reload.
+				if (isRemote()) return;
 				set((s) => ({
 					_retryLoadCount: s._retryLoadCount + 1,
 					error: null,
@@ -292,6 +338,8 @@ export const usePlayerStore = create<PlayerState>()(
 			},
 			setError: (error) => set({ error }),
 			setVolume: (volume) => {
+				// A Remote sets the Active Device's volume; its own stays as it was.
+				if (sendIfRemote({ type: "setVolume", volume: Math.max(0, Math.min(100, volume)) / 100 })) return;
 				// Remember last non-zero volume so mute toggle can restore it
 				if (volume > 0) {
 					set({ volume, _lastNonZeroVolume: volume });
@@ -301,6 +349,7 @@ export const usePlayerStore = create<PlayerState>()(
 			},
 			toggleMute: () => {
 				haptic(6);
+				if (sendIfRemote(muteToggleCommand)) return;
 				const { volume, _lastNonZeroVolume } = get();
 				if (volume > 0) {
 					set({ volume: 0, _lastNonZeroVolume: volume });
@@ -315,6 +364,11 @@ export const usePlayerStore = create<PlayerState>()(
 
 			toggleShuffle: () => {
 				const { shuffle, queue, queueIndex } = get();
+				// The Active Device shuffles (ADR 0003) and publishes the order it picked.
+				if (sendIfRemote({ type: "setShuffle", on: !shuffle })) {
+					set({ shuffle: !shuffle });
+					return;
+				}
 				if (!shuffle) {
 					// Turning ON: shuffle the upcoming tracks. Played tracks and the
 					// current track keep their position so history stays coherent.
@@ -341,19 +395,23 @@ export const usePlayerStore = create<PlayerState>()(
 			jumpToIndex: (index) => {
 				const { queue } = get();
 				if (index < 0 || index >= queue.length) return;
+				if (sendIfRemote({ type: "jumpTo", index })) return;
 				set(goToIndex(index, queue));
 			},
 
 			setCrossfadeDuration: (crossfadeDuration) => set({ crossfadeDuration }),
 			toggleNormalization: () => set((s) => ({ normalizationEnabled: !s.normalizationEnabled })),
 			toggleGapless: () => set((s) => ({ gapless: !s.gapless })),
-			toggleRepeat: () =>
-				set((s) => ({
-					repeat: s.repeat === "off" ? "all" : s.repeat === "all" ? "one" : "off",
-				})),
+			toggleRepeat: () => {
+				const current = get().repeat;
+				const repeat: RepeatMode = current === "off" ? "all" : current === "all" ? "one" : "off";
+				sendIfRemote({ type: "setRepeat", mode: repeat });
+				set({ repeat });
+			},
 
 			playQueue: (queue, startIndex = 0) => {
 				if (queue.length === 0) return;
+				if (sendIfRemote(() => playQueueCommand(queue, startIndex))) return;
 				const { shuffle } = get();
 				if (shuffle && queue.length > 1) {
 					const shuffled = shuffleAround(queue, startIndex);
@@ -399,6 +457,8 @@ export const usePlayerStore = create<PlayerState>()(
 				const insertAt = newQueueIndex + 1;
 				newQueue.splice(insertAt, 0, track);
 
+				// Queue edits on a Remote show at once; the Active Device's publish replaces them.
+				sendIfRemote(() => ({ type: "addNext", track: toSessionTrack(track) }));
 				set({ queue: newQueue, queueIndex: newQueueIndex });
 			},
 
@@ -409,6 +469,7 @@ export const usePlayerStore = create<PlayerState>()(
 					return true;
 				}
 				if (queue.slice(queueIndex + 1).some((t) => t.trackId === track.trackId)) return false;
+				sendIfRemote(() => ({ type: "addToQueue", tracks: [toSessionTrack(track)] }));
 				set({ queue: [...queue, track] });
 				return true;
 			},
@@ -417,6 +478,7 @@ export const usePlayerStore = create<PlayerState>()(
 				const { queue, queueIndex } = get();
 				if (index < 0 || index >= queue.length) return;
 				if (index === queueIndex) return;
+				sendIfRemote({ type: "remove", index });
 
 				const newQueue = [...queue];
 				newQueue.splice(index, 1);
@@ -434,6 +496,7 @@ export const usePlayerStore = create<PlayerState>()(
 			moveInQueue: (from, to) => {
 				const { queue, queueIndex } = get();
 				if (from === to || from < 0 || to < 0 || from >= queue.length || to >= queue.length) return;
+				sendIfRemote({ type: "move", from, to });
 
 				const newQueue = [...queue];
 				const [moved] = newQueue.splice(from, 1);
@@ -458,6 +521,7 @@ export const usePlayerStore = create<PlayerState>()(
 			clearQueue: () => {
 				const { currentTrack, queue } = get();
 				if (!currentTrack || queue.length <= 1) return;
+				sendIfRemote({ type: "clearUpcoming" });
 				set({
 					queue: [currentTrack],
 					queueIndex: 0,

@@ -12,6 +12,9 @@ vi.mock("@/lib/audio-cache", async (importOriginal) => ({
 
 import { AudioEngine } from "./AudioEngine";
 import { usePlayerStore, type PlayerTrack } from "@/stores/usePlayerStore";
+import { usePreviewStore } from "@/stores/usePreviewStore";
+import { useSyncStore } from "@/lib/playback-sync/useSyncStore";
+import { setRemoteSender } from "@/lib/playback-sync/remote";
 import { getCachedBlobUrl } from "@/lib/audio-cache";
 import { presignedUrls } from "./engine/presigned-urls";
 import { resetPrefetchState, warmTrack } from "./engine/prefetch";
@@ -802,5 +805,63 @@ describe("AudioEngine — gapless runs", () => {
 			act(() => plain.ready(200));
 			expect(plain.currentTime).toBeCloseTo(8, 6);
 		});
+	});
+});
+
+describe("AudioEngine — multi-device", () => {
+	afterEach(() => {
+		useSyncStore.getState().reset();
+		setRemoteSender(null);
+	});
+
+	it("falls silent when another Device takes over (was: two Devices playing at once)", async () => {
+		render(<AudioEngine />);
+		act(() => usePlayerStore.getState().play(track("1")));
+		const el = await waitFor(() => elementWithSrc(/stream-progressive\/1$/));
+		act(() => el.ready(200));
+		expect(el.paused).toBe(false);
+		act(() => useSyncStore.getState().set({ role: "remote" }));
+		expect(el.paused).toBe(true);
+		expect(el.src).not.toMatch(/stream-progressive/);
+	});
+
+	it("a Transfer away is not a skip (was: the track was evicted from the cache)", async () => {
+		render(<AudioEngine />);
+		act(() => usePlayerStore.getState().play(track("1")));
+		const el = await waitFor(() => elementWithSrc(/stream-progressive\/1$/));
+		act(() => el.ready(200));
+		act(() => el.tick(5));
+		act(() => useSyncStore.getState().set({ role: "remote" }));
+		expect(fetchMock.mock.calls.map(([u]) => String(u)).filter((u) => /\/skip$/.test(u))).toEqual([]);
+	});
+
+	it("loads nothing while a Remote, then plays the session's track from its position once active", async () => {
+		stored["1"] = "https://r2.example/tracks/1/1.mp3?sig=1";
+		useSyncStore.getState().set({ role: "remote" });
+		usePlayerStore.setState({ currentTrack: track("1"), queue: [track("1")], queueIndex: 0, isPlaying: true, currentTime: 42 });
+		render(<AudioEngine />);
+		await act(async () => {
+			await new Promise((r) => setTimeout(r, 20));
+		});
+		expect(FakeAudio.all.filter((a) => /tracks\/1\//.test(a.src))).toEqual([]);
+
+		act(() => useSyncStore.getState().set({ role: "active" }));
+		const el = await waitFor(() => elementWithSrc(/r2\.example\/tracks\/1\//));
+		el.seekable = ranges([[0, 200]]);
+		act(() => el.ready(200));
+		expect(el.currentTime).toBeCloseTo(42);
+		expect(el.plays).toBe(1);
+	});
+
+	it("a Preview on a Remote pauses the Active Device, which stays paused afterwards (CONTEXT.md, Preview)", async () => {
+		const sent: unknown[] = [];
+		setRemoteSender((c) => sent.push(c));
+		useSyncStore.getState().set({ role: "remote" });
+		usePlayerStore.setState({ currentTrack: track("1"), queue: [track("1")], queueIndex: 0, isPlaying: true });
+		render(<AudioEngine />);
+		act(() => usePreviewStore.setState({ currentTrack: { trackId: "p" } as never, isPlaying: true }));
+		expect(sent).toEqual([{ type: "pause" }]);
+		act(() => usePreviewStore.setState({ currentTrack: null, isPlaying: false }));
+		expect(sent).toEqual([{ type: "pause" }]);
 	});
 });

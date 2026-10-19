@@ -18,7 +18,9 @@ export default defineConfig({
 		// at the top of that test file.
 		environment: "jsdom",
 		setupFiles: ["./src/test/setup.ts"],
-		include: ["src/**/*.{test,spec}.{ts,tsx}"],
+		// convex/ tests run on convex-test (mock backend) under `// @vitest-environment edge-runtime`.
+		include: ["src/**/*.{test,spec}.{ts,tsx}", "convex/**/*.test.ts"],
+		server: { deps: { inline: ["convex-test"] } },
 		exclude: ["node_modules", ".next", "dist"],
 		clearMocks: true,
 		restoreMocks: true,
@@ -30,7 +32,10 @@ export default defineConfig({
 			// new untested files here will drop the average and fail the gate.
 			// As you add tests for new modules, append them here.
 			include: [
+				"convex/{lib,devices,playback,commands,presence}.ts",
 				"src/stores/usePlayerStore.ts",
+				"src/lib/playback-sync/{device,execute,remote,sync,track,useSyncStore}.ts",
+				"src/components/audio/DevicePicker.tsx",
 				"src/stores/usePreviewStore.ts",
 				"src/stores/useTrackActionStore.ts",
 				"src/lib/library.ts",
