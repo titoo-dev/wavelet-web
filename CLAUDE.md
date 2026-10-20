@@ -108,6 +108,10 @@ CI runs on every PR (`.github/workflows/ci.yml`): tests + coverage gate + `tsc -
 | Streaming routes | `src/app/api/v1/stream{,-progressive,-url}/[trackId]/route.ts` | `route.test.ts` (32 tests) |
 | Library routes | `src/app/api/v1/library/*` | `route.test.ts` (50 tests) |
 | Recent plays | `src/app/api/v1/recent-plays/**` | `route.test.ts` (26 tests) |
+| Autoplay (when the last track of the queue plays, repeat off, setting on, not on a Remote: one POST per last track; seeds = the last 5 tracks, current first; appended with `source: "autoplay"` only while that track is still last; server mixes the Deezer artist radios of ≤ 3 seed artists, leaves out queued / early-skipped (more early skips than listens) / played in the last 3 h / artists skipped early 3× never heard, ≤ 2 per artist, no artist twice in a row when avoidable) | `src/app/api/v1/autoplay/route.ts`, `src/lib/autoplay.ts`, `src/hooks/useAutoplay.ts` (mounted in `(main)/layout.tsx`), `usePlayerStore` `appendAutoplay` / `autoplay` | `autoplay/route.test.ts`, `autoplay.test.ts`, `useAutoplay.test.ts`, `usePlayerStore.test.ts` "autoplay" |
+| Similar tracks from outside Deezer (ListenBrainz: Deezer ISRC → MusicBrainz recording, ≤ 1 req/s per instance → labs similar-recordings, no key; Last.fm `track.getSimilar` with `LASTFM_API_KEY`, skipped without; each artist + title found back with a plain Deezer search — the `artist:"…"` advanced search answers nothing — keeping the result by that artist (a credit may name more; a longer Deezer name is someone else) with that title; ≤ 10 per source; all cached a day in memory; a failing source is left out) — blended after the first radio in autoplay (seed: the playing track) and the Daily Mix (seeds: 2 loved tracks of the day's artists) | `src/lib/similar.ts` (+ live: `npx tsx scripts/smoke-similar.ts [trackId…]`) | `similar.test.ts`, `autoplay/route.test.ts`, `mixes/daily/route.test.ts` |
+| Daily Mix (home; 3 of the top artists — listens 2 to the end / 1 heard / −1 early skip, follow 5 — a window moving daily through the top 9; ⅓ loved tracks by them (liked / recent, shuffled for the day), ⅔ discoveries from their radios, nothing the user has, early skips out, ≤ 3 per artist; no history → the user's own Deezer Flow, never the service account's; cached per user and day (`DailyMix`), `refresh=1` rebuilds, yesterday's served when today's fails; the client sends its local day; played with `source: "daily-mix"`) | `src/app/api/v1/mixes/daily/route.ts`, `src/lib/daily-mix.ts`, `src/hooks/useDailyMix.ts`, `(main)/_components/DailyMixCard.tsx` (home, under the quick tiles) | `mixes/daily/route.test.ts`, `daily-mix.test.ts`, `DailyMixCard.test.tsx` |
+| Listening log (one `ListenEvent` per play, sent when it ends: skipped / completed / stopped / failed / transferred / closed; only once the sound started; a repeat or a closed tab reports a part, never the same part twice; keepalive fetch; server drops events > 5 min ahead, > 30 days old or ending before they start; user from the session only) | `src/app/api/v1/listens/route.ts`, `src/lib/listens.ts`, `engine/session.ts` `takeListen` / `endReasonOf` (+ wiring in `AudioEngine.tsx`) | `listens/route.test.ts`, `session.test.ts` "listening log", `AudioEngine.test.tsx` "listening log" |
 | Preferences | `src/app/api/v1/preferences/route.ts` | `route.test.ts` (11 tests) |
 | Download queue | `src/stores/useDownloadStore.ts`, `src/lib/download.ts` | `useDownloadStore.test.ts`, `download.test.ts` |
 | ⌘K palette | `src/components/command/CommandPalette.tsx`, `src/stores/useCommandStore.ts` | `CommandPalette.test.tsx`, `useCommandStore.test.ts` |
@@ -186,7 +190,8 @@ When you finish locking in any of the above, append it to the table above and to
 ## Database Models (Prisma)
 
 ```
-User            ── 1:many ── Session, Account, Playlist, SavedTrack, Album, FollowedArtist, SharedTrack, RecentPlay
+User            ── 1:many ── Session, Account, Playlist, SavedTrack, Album, FollowedArtist, SharedTrack, RecentPlay, ListenEvent
+                ── 1:1 ──── DailyMix (cache)
                 ── 1:1 ──── UserSettings (JSON blob), UserPreferences (JSON blob), DeezerCredential
 DeezerCredential── encrypted ARL (enc:v1), licence flags (canStreamHq / canStreamLossless), childAccount
 Config          ── key/value store (userId + key composite PK, JSON value) — global settings (server-wide maxBitrate, …)
@@ -197,6 +202,9 @@ StoredTrack     ── global file cache (trackId + bitrate unique), shared acro
 PersistLease    ── (trackId, bitrate) lease of an in-flight progressive persist, expiresAt-based takeover
 SharedTrack     ── public share links (shareId unique; one per userId + trackId), optional expiresAt (expired links purged after 30 days), play counter
 Album / AlbumTrack, SavedTrack, RecentPlay ── per-user library; they ref-count StoredTrack files (see library.ts)
+DailyMix        ── the user's Daily Mix of the day (one row per user: day + JSON payload), replaced on the next day
+ListenEvent     ── append-only listening log, one row per play (msPlayed, endReason, client, shuffle) — recommendation
+                   signals; never capped, never anchors files (RecentPlay stays the capped UI history)
 TrackMatch      ── Spotify → Deezer match cache
 Verification    ── better-auth verification tokens
 ```

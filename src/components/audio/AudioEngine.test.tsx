@@ -463,6 +463,98 @@ describe("AudioEngine — play count", () => {
 	});
 });
 
+describe("AudioEngine — listening log", () => {
+	type Sent = { events: { trackId: string; endReason: string; msPlayed: number; client: string; durationMs: number | null }[] };
+	const listens = () =>
+		fetchMock.mock.calls
+			.filter(([u]) => String(u) === "/api/v1/listens")
+			.flatMap(([, init]) => (JSON.parse(String((init as RequestInit).body)) as Sent).events);
+	const listenFor = (el: FakeAudio, seconds: number) =>
+		act(() => {
+			for (let t = 0; t <= seconds; t += 0.25) el.tick(t);
+		});
+
+	it("reports a track left for another one as skipped, with the time really listened to", async () => {
+		render(<AudioEngine />);
+		act(() => usePlayerStore.getState().playQueue([track("1"), track("2")], 0));
+		const el = await waitFor(() => elementWithSrc(/stream-progressive\/1$/));
+		act(() => el.ready(200));
+		act(() => el.fire("playing"));
+		listenFor(el, 10);
+		act(() => usePlayerStore.getState().next());
+		await waitFor(() => expect(listens()).toHaveLength(1));
+		expect(listens()[0]).toMatchObject({ trackId: "1", endReason: "skipped", msPlayed: 10_000, client: "web", durationMs: 200_000 });
+	});
+
+	it("reports a track that ran to its end as completed", async () => {
+		render(<AudioEngine />);
+		act(() => usePlayerStore.getState().playQueue([track("1"), track("2")], 0));
+		const el = await waitFor(() => elementWithSrc(/stream-progressive\/1$/));
+		act(() => el.ready(200));
+		act(() => el.fire("playing"));
+		listenFor(el, 5);
+		act(() => el.fire("ended"));
+		await waitFor(() => expect(listens()).toHaveLength(1));
+		expect(listens()[0]).toMatchObject({ trackId: "1", endReason: "completed" });
+	});
+
+	it("reports nothing for a track that never started playing", async () => {
+		render(<AudioEngine />);
+		act(() => usePlayerStore.getState().playQueue([track("1"), track("2")], 0));
+		await waitFor(() => elementWithSrc(/stream-progressive\/1$/));
+		act(() => usePlayerStore.getState().next());
+		await waitFor(() => elementWithSrc(/stream-progressive\/2$/));
+		expect(listens()).toEqual([]);
+	});
+
+	it("reports each time round of a repeated track", async () => {
+		render(<AudioEngine />);
+		act(() => usePlayerStore.getState().play(track("1")));
+		act(() => usePlayerStore.setState({ repeat: "one" }));
+		const el = await waitFor(() => elementWithSrc(/stream-progressive\/1$/));
+		act(() => el.ready(200));
+		act(() => el.fire("playing"));
+		listenFor(el, 3);
+		act(() => el.fire("ended"));
+		listenFor(el, 2);
+		act(() => el.fire("ended"));
+		expect(listens().map((l) => [l.endReason, l.msPlayed])).toEqual([
+			["completed", 3000],
+			["completed", 2000],
+		]);
+	});
+
+	it("reports the part played so far when the page goes away", async () => {
+		render(<AudioEngine />);
+		act(() => usePlayerStore.getState().play(track("1")));
+		const el = await waitFor(() => elementWithSrc(/stream-progressive\/1$/));
+		act(() => el.ready(200));
+		act(() => el.fire("playing"));
+		listenFor(el, 4);
+		act(() => {
+			window.dispatchEvent(new Event("pagehide"));
+		});
+		expect(listens()).toMatchObject([{ trackId: "1", endReason: "closed", msPlayed: 4000 }]);
+		// Nothing played since: the same part is not sent twice.
+		act(() => {
+			window.dispatchEvent(new Event("pagehide"));
+		});
+		expect(listens()).toHaveLength(1);
+	});
+
+	it("reports a play whose sound moved to another Device as transferred", async () => {
+		render(<AudioEngine />);
+		act(() => usePlayerStore.getState().play(track("1")));
+		const el = await waitFor(() => elementWithSrc(/stream-progressive\/1$/));
+		act(() => el.ready(200));
+		act(() => el.fire("playing"));
+		listenFor(el, 6);
+		act(() => useSyncStore.getState().set({ role: "remote" }));
+		expect(listens()).toMatchObject([{ trackId: "1", endReason: "transferred", msPlayed: 6000 }]);
+		useSyncStore.getState().reset();
+	});
+});
+
 describe("AudioEngine — long pause on a presigned URL", () => {
 	it("resuming after the URL expired signs it again and resumes at the same position", async () => {
 		stored["1"] = "https://r2.example/tracks/1/1.mp3?sig=1";

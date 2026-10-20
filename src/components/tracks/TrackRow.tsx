@@ -31,6 +31,8 @@ export interface TrackRowTrack {
 	previewUrl?: string | null;
 	/** Pre-computed bitrate label (e.g. "FLAC", "320"). When omitted, the cell is hidden. */
 	bitrateLabel?: string | null;
+	/** Carried to the player (PlayerTrack.source), e.g. "daily-mix". */
+	source?: string | null;
 }
 
 export interface TrackRowProps {
@@ -147,6 +149,7 @@ export function TrackRow({
 			albumId: track.albumId ?? null,
 			cover: track.cover,
 			duration: track.duration ?? null,
+			...(track.source ? { source: track.source } : {}),
 		};
 		if (queue && queue.length > 0) {
 			const mapped: PlayerTrack[] = queue.map((t) => ({
@@ -158,6 +161,7 @@ export function TrackRow({
 				albumId: t.albumId ?? null,
 				cover: t.cover,
 				duration: t.duration ?? null,
+				...(t.source ? { source: t.source } : {}),
 			}));
 			// Ensure the tapped track is in the queue. If callers passed a list
 			// that excludes the tapped track for some reason, fall back gracefully.

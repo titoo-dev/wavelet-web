@@ -32,11 +32,14 @@ import {
 	advanceQueue,
 	claimBackgroundPersist,
 	createTrackSession,
+	endReasonOf,
 	reachedPlayThreshold,
 	shouldNotifySkip,
 	startVolume,
+	takeListen,
 	type TrackSession,
 } from "@/components/audio/engine/session";
+import type { ListenEndReason } from "@/lib/listens";
 import {
 	createAutoSkip,
 	createTimerBag,
@@ -149,6 +152,26 @@ function notifyTrackSkipped(trackId: string) {
 		fetch(url, { method: "POST", credentials: "include", keepalive: true }).catch(() => {});
 	} catch {
 		// Non-fatal
+	}
+}
+
+/**
+ * Append the part of a play not reported yet to the listening log
+ * (recommendation signals). keepalive: a closing tab still sends it.
+ */
+function reportListen(session: TrackSession | null, reason: ListenEndReason) {
+	const listen = takeListen(session, reason, { client: "web", shuffle: usePlayerStore.getState().shuffle });
+	if (!listen) return;
+	try {
+		fetch("/api/v1/listens", {
+			method: "POST",
+			credentials: "include",
+			keepalive: true,
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ events: [listen] }),
+		}).catch(() => {});
+	} catch {
+		// Non-fatal — a missed listen
 	}
 }
 
@@ -354,12 +377,17 @@ export function AudioEngine() {
 	// notification) and starts a fresh one. Both paths that change the
 	// current track — the load effect and the crossfade — go through here.
 	const beginTrack = useCallback(
-		(trackId: string) => {
+		(track: PlayerTrack) => {
+			const { trackId } = track;
 			const prev = sessionRef.current;
 			if (prev && prev.trackId !== trackId && shouldNotifySkip(prev)) {
 				notifyTrackSkipped(prev.trackId);
 			}
-			sessionRef.current = createTrackSession(trackId, { autoAdvance: autoAdvanceRef.current });
+			if (prev) reportListen(prev, endReasonOf(prev));
+			sessionRef.current = createTrackSession(trackId, {
+				autoAdvance: autoAdvanceRef.current,
+				meta: { artistId: track.artistId, albumId: track.albumId, duration: track.duration, source: track.source },
+			});
 			autoAdvanceRef.current = false;
 			prevTrackIdRef.current = trackId;
 			// Timers of the previous track must never fire on this one.
@@ -527,10 +555,18 @@ export function AudioEngine() {
 		const onVisibility = () => {
 			if (document.visibilityState === "hidden") save();
 		};
-		window.addEventListener("pagehide", save);
+		// The page goes away mid-track: report what was played so far (a page
+		// back from the bfcache reports the rest as another part). Not on
+		// visibilitychange: a hidden tab keeps playing.
+		const onPageHide = () => {
+			save();
+			const session = sessionRef.current;
+			if (session) reportListen(session, session.ended ? "completed" : "closed");
+		};
+		window.addEventListener("pagehide", onPageHide);
 		document.addEventListener("visibilitychange", onVisibility);
 		return () => {
-			window.removeEventListener("pagehide", save);
+			window.removeEventListener("pagehide", onPageHide);
 			document.removeEventListener("visibilitychange", onVisibility);
 		};
 	}, [timeOf]);
@@ -883,6 +919,11 @@ export function AudioEngine() {
 			// track wasn't counted, it's a skip — unless the sound just moved to
 			// another Device (was: a Transfer counted as a skip and evicted the track).
 			if (!remoteRef.current && shouldNotifySkip(sessionRef.current)) notifyTrackSkipped(sessionRef.current.trackId);
+			const stopped = sessionRef.current;
+			if (stopped) {
+				const reason = remoteRef.current ? "transferred" : stopped.ended ? "completed" : stopped.failed ? "failed" : "stopped";
+				reportListen(stopped, reason);
+			}
 			sessionRef.current = null;
 			// Nothing started for the stopped track may land afterwards: a URL
 			// still resolving, a seek waiting for the stored file, a resume
@@ -917,7 +958,7 @@ export function AudioEngine() {
 			if (!autoAdvanceRef.current) gaplessBlockedRef.current = false;
 			// Ends the previous session (skip notification if it never
 			// reached 30 s) and resets every per-track flag.
-			beginTrack(currentTrack.trackId);
+			beginTrack(currentTrack);
 
 			// Cancel any in-progress crossfade on manual track change
 			if (crossfadeActiveRef.current) {
@@ -1171,13 +1212,15 @@ export function AudioEngine() {
 		// per-track reset as the load effect, which then has nothing to load.
 		const advanceInRun = (deck: GaplessDeck, trackId: string) => {
 			const { queue, queueIndex } = usePlayerStore.getState();
-			if (queue[queueIndex + 1]?.trackId !== trackId) {
+			const nextTrack = queue[queueIndex + 1];
+			if (sessionRef.current) sessionRef.current.ended = true;
+			if (nextTrack?.trackId !== trackId) {
 				// The queue moved under the run: go on like a track that ended.
 				advanceQueue(autoAdvanceRef, true, usePlayerStore);
 				return;
 			}
 			autoAdvanceRef.current = true;
-			beginTrack(trackId);
+			beginTrack(nextTrack);
 			setDuration(deck.trackDuration());
 			usePlayerStore.getState().next();
 			// next() flags the new track as buffering; it is already playing.
@@ -1377,7 +1420,8 @@ export function AudioEngine() {
 						// volume itself, and the flag would make the next user
 						// resume skip its fade-in.
 						takePreloaded(nextTrack.trackId);
-						beginTrack(nextTrack.trackId);
+						if (sessionRef.current) sessionRef.current.ended = true;
+						beginTrack(nextTrack);
 						activateElement(preloaded, nextTrack);
 						skipPlayEffectRef.current = true;
 
@@ -1410,6 +1454,8 @@ export function AudioEngine() {
 
 		handlersRef.current.onEnded = () => {
 			if (repeat === "one") {
+				// Each time round is a play of its own in the listening log.
+				reportListen(sessionRef.current, "completed");
 				const audio = audioRef.current;
 				if (audio) {
 					// A gapless run's element plays several tracks: back to this one's start.
@@ -1419,6 +1465,7 @@ export function AudioEngine() {
 					audio.play().catch(() => {});
 				}
 			} else {
+				if (sessionRef.current) sessionRef.current.ended = true;
 				// Queue advance: the next track starts without a fade-in.
 				advanceQueue(autoAdvanceRef, true, usePlayerStore);
 			}
@@ -1635,7 +1682,11 @@ export function AudioEngine() {
 			consecutiveFailuresRef.current = 0;
 			const audio = audioRef.current;
 			const session = sessionRef.current;
-			if (audio && session) session.playedFrom = audio.src;
+			if (audio && session) {
+				// The listen starts with the sound, not with the load.
+				if (session.playedFrom === null && !session.reportedOnce) session.listenStartedAt = Date.now();
+				session.playedFrom = audio.src;
+			}
 		};
 
 		handlersRef.current.onProgress = () => {
