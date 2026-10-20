@@ -50,7 +50,7 @@ export interface OutstandingCommand {
 
 export type WriteResult =
 	| { ok: true; queueVersion: number }
-	| { ok: false; reason: "not-active" | "offline" | "not-activated" | "unknown-device"; activeDeviceId: string | null };
+	| { ok: false; reason: "not-active" | "offline" | "unknown-device"; activeDeviceId: string | null };
 
 export type SendResult =
 	| { ok: true; id: string; targetDeviceId: string }

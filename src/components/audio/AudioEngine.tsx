@@ -321,7 +321,23 @@ export function AudioEngine() {
 		// A routed element is silent while the context is suspended.
 		if (isRouted(audio) && !isAudioCtxRunning()) initAudioCtx();
 		setElementVolume(audio, from);
-		audio.play().catch(() => {});
+		audio.play().then(
+			() => toast.dismiss("play-blocked"),
+			(err: unknown) => {
+				// The autoplay policy refused: a tab that never had a click (a Transfer here, a
+				// restored session). Paused rather than shown playing in silence, and the prompt's
+				// button is the click the browser wants (was: playing everywhere, no sound).
+				if ((err as { name?: string } | null)?.name !== "NotAllowedError" || audioRef.current !== audio) return;
+				if (!usePlayerStore.getState().isPlaying) return;
+				usePlayerStore.getState().pause();
+				toast("Click to play here", {
+					id: "play-blocked",
+					description: "Your browser needs a click in this window before it plays sound.",
+					duration: Infinity,
+					action: { label: "Play", onClick: () => usePlayerStore.getState().resume() },
+				});
+			}
+		);
 		// duration 0 still cancels a fade-out left running on this element
 		adjustVolume(audio, target, { duration: fadeMs });
 	}, []);

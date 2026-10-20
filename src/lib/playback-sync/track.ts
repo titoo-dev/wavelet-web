@@ -69,10 +69,34 @@ export function toSession(p: LocalPlayback): { state: PlaybackState; queue: Queu
 	};
 }
 
-/** Where the session's position is at `now`, given when it was received (`anchor`), in seconds. */
+/** Where the session's position is at `now`, given the local time it was true (`anchor`), in seconds. */
 export function extrapolate(state: PlaybackState, anchor: number, now: number): number {
 	const ms = state.isPlaying ? state.positionMs + Math.max(0, now - anchor) : state.positionMs;
 	const duration = state.currentTrack?.duration;
 	const capped = duration ? Math.min(ms, duration * 1000) : ms;
 	return capped / 1000;
+}
+
+/**
+ * Where the server's clock stands against this tab's, so a position stamped on the server is
+ * extrapolated from when it was true rather than from when it arrived: a snapshot met on reconnect
+ * can be up to a position refresh old.
+ *
+ * Every server time seen on arrival gives `local − server` = clock offset + how late it came; the
+ * smallest of the recent ones is the estimate (a stale snapshot only reads larger). The snapshot
+ * itself is one of them, so a position is never placed after its arrival.
+ */
+export class ServerClock {
+	private static readonly KEPT = 8;
+	private readonly lags: number[] = [];
+
+	observe(serverMs: number, receivedAt: number) {
+		this.lags.push(receivedAt - serverMs);
+		if (this.lags.length > ServerClock.KEPT) this.lags.shift();
+	}
+
+	/** This tab's time when the server's clock read `serverMs`. */
+	toLocal(serverMs: number): number {
+		return serverMs + (this.lags.length ? Math.min(...this.lags) : 0);
+	}
 }

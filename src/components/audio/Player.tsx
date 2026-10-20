@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils";
 import { ArtistLink } from "@/components/links/EntityLink";
 import { leavePlayer } from "./leave-player";
 import { DevicePicker, PlayingOn } from "./DevicePicker";
-import { useShownVolume } from "@/lib/playback-sync/useSyncStore";
+import { shownVolume, useShownVolume } from "@/lib/playback-sync/useSyncStore";
 import { toast } from "sonner";
 
 function Tip({ label, trigger, children }: { label: string; trigger: ReactElement; children: React.ReactNode }) {
@@ -106,8 +106,9 @@ function VolumeControl() {
 		const onWheel = (e: WheelEvent) => {
 			if (e.deltaY === 0) return;
 			e.preventDefault();
-			const { volume, setVolume } = usePlayerStore.getState();
-			setVolume(Math.min(100, Math.max(0, volume + (e.deltaY < 0 ? VOLUME_STEP : -VOLUME_STEP))));
+			// From the shown volume: the Active Device's while this tab is a Remote (was: this tab's own, a jump).
+			const step = e.deltaY < 0 ? VOLUME_STEP : -VOLUME_STEP;
+			usePlayerStore.getState().setVolume(Math.min(100, Math.max(0, shownVolume() + step)));
 		};
 		el.addEventListener("wheel", onWheel, { passive: false });
 		return () => el.removeEventListener("wheel", onWheel);

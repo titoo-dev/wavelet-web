@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PlayerTrack } from "@/stores/usePlayerStore";
-import { extrapolate, MAX_QUEUE, toPlayerTrack, toSession, toSessionTrack, windowStartFor } from "./track";
+import { extrapolate, MAX_QUEUE, ServerClock, toPlayerTrack, toSession, toSessionTrack, windowStartFor } from "./track";
 
 const t = (id: string): PlayerTrack => ({ trackId: id, title: `T${id}`, artist: "A", cover: null, duration: 200 });
 
@@ -104,5 +104,20 @@ describe("extrapolate", () => {
 		const unknown = { ...s, currentTrack: { ...s.currentTrack, duration: null } };
 		expect(extrapolate(unknown, 0, 500_000)).toBe(510);
 		expect(extrapolate(s, 5_000, 1_000)).toBe(10);
+	});
+});
+
+describe("ServerClock", () => {
+	it("takes the server's time as this tab's until it saw one", () => {
+		expect(new ServerClock().toLocal(5_000)).toBe(5_000);
+	});
+
+	it("keeps the least late of the recent samples, so a stale one does not count", () => {
+		const clock = new ServerClock();
+		clock.observe(100_000, 40_200); // fresh: 200 ms late on a clock 60 s behind
+		clock.observe(85_000, 40_500); // a snapshot 15 s old
+		expect(clock.toLocal(100_000)).toBe(40_200);
+		for (let i = 0; i < 8; i++) clock.observe(200_000, 140_400);
+		expect(clock.toLocal(200_000)).toBe(140_400);
 	});
 });

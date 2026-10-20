@@ -58,10 +58,18 @@ describe("DevicePicker", () => {
 		expect(items.map((i) => i.textContent)).toEqual([
 			"Pixel 8Playing",
 			"Chrome · Windows · This device",
-			"Firefox · LinuxClick anywhere in that window to use it",
+			"Firefox · LinuxMay ask for a click in that window to play",
 		]);
 		expect(items[0]).toHaveAttribute("aria-checked", "true");
-		expect(items[2]).toHaveAttribute("aria-disabled", "true");
+	});
+
+	it("a tab that never had a click can be picked (was: greyed out, the sound could not move to the PC)", async () => {
+		render(<DevicePicker />);
+		await userEvent.click(screen.getByRole("button", { name: /Choose a device/ }));
+		const tab = await screen.findByRole("menuitemradio", { name: /Firefox · Linux/ });
+		expect(tab).not.toHaveAttribute("aria-disabled");
+		await userEvent.click(tab);
+		await waitFor(() => expect(transfer).toHaveBeenCalledWith("other-tab"));
 	});
 
 	it("picking a Device transfers the sound to it", async () => {

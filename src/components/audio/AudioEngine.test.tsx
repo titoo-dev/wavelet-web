@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, act, waitFor } from "@testing-library/react";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
-vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { error: vi.fn() }) }));
+vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { error: vi.fn(), dismiss: vi.fn() }) }));
 vi.mock("@/lib/audio-cache", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/audio-cache")>()),
 	getCachedBlobUrl: vi.fn(async () => null),
@@ -10,6 +10,7 @@ vi.mock("@/lib/audio-cache", async (importOriginal) => ({
 	removeCached: vi.fn(async () => {}),
 }));
 
+import { toast } from "sonner";
 import { AudioEngine } from "./AudioEngine";
 import { usePlayerStore, type PlayerTrack } from "@/stores/usePlayerStore";
 import { usePreviewStore } from "@/stores/usePreviewStore";
@@ -36,6 +37,8 @@ const ranges = (pairs: [number, number][] = []): Ranges => ({
 
 class FakeAudio extends EventTarget {
 	static all: FakeAudio[] = [];
+	/** The browser's autoplay policy refuses play() (a tab that never had a click). */
+	static blocked = false;
 	preload = "";
 	crossOrigin: string | null = null;
 	readyState = 0;
@@ -80,6 +83,7 @@ class FakeAudio extends EventTarget {
 	load() {}
 	play() {
 		this.plays++;
+		if (FakeAudio.blocked) return Promise.reject(new DOMException("play() needs a user gesture", "NotAllowedError"));
 		this.paused = false;
 		return Promise.resolve();
 	}
@@ -134,6 +138,7 @@ function elementWithSrc(pattern: RegExp): FakeAudio {
 
 beforeEach(() => {
 	FakeAudio.all = [];
+	FakeAudio.blocked = false;
 	vi.stubGlobal("Audio", FakeAudio);
 	stored = {};
 	fetchMock = vi.fn(async (input: RequestInfo | URL) => {
@@ -851,6 +856,33 @@ describe("AudioEngine — multi-device", () => {
 		act(() => el.ready(200));
 		expect(el.currentTime).toBeCloseTo(42);
 		expect(el.plays).toBe(1);
+	});
+
+	it("a Transfer to a tab the browser won't let play pauses and asks for a click (was: shown playing, no sound)", async () => {
+		stored["1"] = "https://r2.example/tracks/1/1.mp3?sig=1";
+		useSyncStore.getState().set({ role: "remote" });
+		usePlayerStore.setState({ currentTrack: track("1"), queue: [track("1")], queueIndex: 0, isPlaying: true, currentTime: 42 });
+		render(<AudioEngine />);
+		FakeAudio.blocked = true;
+		act(() => useSyncStore.getState().set({ role: "active" }));
+		const el = await waitFor(() => elementWithSrc(/r2\.example\/tracks\/1\//));
+		el.seekable = ranges([[0, 200]]);
+		await act(async () => el.ready(200));
+		expect(usePlayerStore.getState().isPlaying).toBe(false);
+		expect(toast).toHaveBeenCalledWith(
+			"Click to play here",
+			expect.objectContaining({ id: "play-blocked", action: expect.objectContaining({ label: "Play" }) })
+		);
+
+		// The prompt's button is the click the browser wants.
+		FakeAudio.blocked = false;
+		const [, opts] = vi.mocked(toast).mock.calls.find(([title]) => title === "Click to play here")!;
+		const plays = el.plays;
+		await act(async () => (opts as unknown as { action: { onClick: () => void } }).action.onClick());
+		expect(usePlayerStore.getState().isPlaying).toBe(true);
+		expect(el.plays).toBe(plays + 1);
+		expect(el.paused).toBe(false);
+		expect(toast.dismiss).toHaveBeenCalledWith("play-blocked");
 	});
 
 	it("a Preview on a Remote pauses the Active Device, which stays paused afterwards (CONTEXT.md, Preview)", async () => {

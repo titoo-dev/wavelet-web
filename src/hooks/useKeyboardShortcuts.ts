@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { usePlayerStore } from "@/stores/usePlayerStore";
+import { shownVolume } from "@/lib/playback-sync/useSyncStore";
 import { useCommandStore } from "@/stores/useCommandStore";
 import { useLyricsStore } from "@/stores/useLyricsStore";
 import { insideForeignLayer, isActivatable, isComposing, letterOf, ownsKeys } from "@/lib/hotkeys";
@@ -100,13 +101,13 @@ export function useKeyboardShortcuts() {
 					// Plain ArrowUp / ArrowDown scroll the page.
 					if (!e.shiftKey) return;
 					e.preventDefault();
-					state.setVolume(Math.min(100, state.volume + 5));
+					state.setVolume(Math.min(100, shownVolume() + 5));
 					return;
 				}
 				case "ArrowDown": {
 					if (!e.shiftKey) return;
 					e.preventDefault();
-					state.setVolume(Math.max(0, state.volume - 5));
+					state.setVolume(Math.max(0, shownVolume() - 5));
 					return;
 				}
 			}

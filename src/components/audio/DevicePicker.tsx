@@ -17,7 +17,6 @@ import type { DeviceView, WriteResult } from "@/lib/playback-sync/types";
 import { cn } from "@/lib/utils";
 
 const REFUSALS: Record<Exclude<WriteResult, { ok: true }>["reason"], string> = {
-	"not-activated": "Click or tap anywhere in that window first, then pick it again",
 	offline: "That device is offline",
 	"unknown-device": "That device is gone",
 	"not-active": "Another device took over",
@@ -77,7 +76,6 @@ export function DevicePicker({ className, side = "top" }: { className?: string; 
 							<DropdownMenuRadioItem
 								key={d.deviceId}
 								value={d.deviceId}
-								disabled={!d.activated && d.deviceId !== me}
 								className="items-start gap-2.5 rounded-xl px-2.5 py-2"
 							>
 								<DeviceIcon device={d} className="mt-0.5" />
@@ -87,7 +85,7 @@ export function DevicePicker({ className, side = "top" }: { className?: string; 
 										{d.deviceId === me && <span className="text-muted-foreground"> · This device</span>}
 									</span>
 									{!d.activated && d.deviceId !== me && (
-										<span className="text-xs text-muted-foreground">Click anywhere in that window to use it</span>
+										<span className="text-xs text-muted-foreground">May ask for a click in that window to play</span>
 									)}
 									{d.deviceId === activeDeviceId && <span className="text-xs text-primary">Playing</span>}
 								</span>
