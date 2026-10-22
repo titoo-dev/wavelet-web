@@ -62,7 +62,7 @@ describe("DailyMixCard", () => {
 		render(<DailyMixCard />);
 		expect(await screen.findByText("Daily Mix")).toBeTruthy();
 		expect(screen.getByText("Daft Punk, Justice and Kavinsky, and more like them")).toBeTruthy();
-		expect(String(fetchMock.mock.calls[0][0])).toBe(`/api/v1/mixes/daily?day=${localDay()}`);
+		expect(fetchMock.mock.calls.map(([u]) => String(u))).toContain(`/api/v1/mixes/daily?day=${localDay()}`);
 	});
 
 	it("plays the mix from the start, its tracks tagged daily-mix", async () => {
@@ -100,7 +100,9 @@ describe("DailyMixCard", () => {
 		answer(mix());
 		render(<DailyMixCard />);
 		fireEvent.click(await screen.findByRole("button", { name: "New mix" }));
-		await waitFor(() => expect(String(fetchMock.mock.calls[1]?.[0])).toMatch(/&refresh=1$/));
+		// Only the mix's own requests: the rows also ask /api/v1/library/status (was: read the 2nd call, flaky in CI).
+		const mixCalls = () => fetchMock.mock.calls.map(([u]) => String(u)).filter((u) => u.startsWith("/api/v1/mixes/daily"));
+		await waitFor(() => expect(mixCalls()[1]).toMatch(/&refresh=1$/));
 	});
 
 	it.each([
