@@ -40,10 +40,12 @@ import {
 	VolumeGlyph,
 	SlideSwap,
 } from "@/components/motion/icons";
-import { ChevronDown, Link as LinkIcon, ListMusic, MicVocal, MoreHorizontal, Share, SlidersHorizontal } from "lucide-react";
+import Link from "next/link";
+import { ChevronDown, Link as LinkIcon, ListMusic, MicVocal, MoreHorizontal, Radio, Share, SlidersHorizontal } from "lucide-react";
 import { useAudioLevel } from "@/hooks/useAudioLevel";
 import { cn } from "@/lib/utils";
-import { ArtistLink } from "@/components/links/EntityLink";
+import { ArtistLink, useOverlayLink } from "@/components/links/EntityLink";
+import { trackRadioHref } from "@/lib/entity-links";
 import { leavePlayer } from "./leave-player";
 import { DevicePicker, PlayingOn } from "./DevicePicker";
 import { useShownVolume } from "@/lib/playback-sync/useSyncStore";
@@ -461,8 +463,10 @@ function ActionPill({ lyrics, onToggleLyrics }: { lyrics: boolean; onToggleLyric
 	const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 	const isShared = useShareStore((s) => (currentTrack ? s.shared.has(currentTrack.trackId) : false));
 	const [shareOpen, setShareOpen] = useState(false);
+	const radioLink = useOverlayLink(leavePlayer);
 
 	if (!currentTrack) return null;
+	const radioHref = isAuthenticated ? trackRadioHref(currentTrack.trackId) : null;
 	const pillKey =
 		"inline-flex size-11 shrink-0 items-center justify-center rounded-full text-foreground outline-none transition-[background-color,color,scale] duration-300 hover:bg-foreground/8 active:scale-[0.86] focus-visible:ring-[3px] focus-visible:ring-ring/30 [&_svg]:size-5";
 
@@ -489,6 +493,11 @@ function ActionPill({ lyrics, onToggleLyrics }: { lyrics: boolean; onToggleLyric
 				</SlideSwap>
 			</button>
 			<DevicePicker className={cn(pillKey, "data-popup-open:bg-foreground/8")} />
+			{radioHref && (
+				<Link href={radioHref} replace={radioLink.replace} onClick={radioLink.onClick} aria-label="Song radio" title="Song radio" className={cn(pillKey, "no-underline")}>
+					<Radio />
+				</Link>
+			)}
 			{isAuthenticated && (
 				<>
 					<button

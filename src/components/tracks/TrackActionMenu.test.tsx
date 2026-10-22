@@ -23,6 +23,24 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 });
 
+describe("TrackActionMenu — song radio", () => {
+	it("links to the track's song radio", async () => {
+		const user = userEvent.setup();
+		render(<TrackActionMenu track={track} />);
+		await user.click(screen.getByRole("button", { name: "Track actions" }));
+		expect((await screen.findByText("Go to song radio")).closest("a")).toHaveAttribute("href", "/radio?track=42");
+	});
+
+	it("has no radio entry signed out", async () => {
+		useAuthStore.setState({ isAuthenticated: false });
+		const user = userEvent.setup();
+		render(<TrackActionMenu track={track} />);
+		await user.click(screen.getByRole("button", { name: "Track actions" }));
+		await screen.findByText("Nofy");
+		expect(screen.queryByText("Go to song radio")).toBeNull();
+	});
+});
+
 describe("TrackActionMenu — new playlist field (HK-08)", () => {
 	it("Escape leaves the name field and keeps the playlist list open (was: Escape was swallowed and the field stayed)", async () => {
 		const user = userEvent.setup();

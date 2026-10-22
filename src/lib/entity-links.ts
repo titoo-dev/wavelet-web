@@ -27,6 +27,12 @@ export function albumHref(id: Id, title?: string | null, artist?: string | null)
 	return `/album?title=${encodeURIComponent(t)}${a ? `&artist=${encodeURIComponent(primaryArtistName(a))}` : ""}`;
 }
 
+/** A track's song radio; null for ids the server can't build one from (user uploads are negative). */
+export function trackRadioHref(trackId: Id): string | null {
+	const id = trackId == null ? "" : String(trackId).trim();
+	return /^[1-9]\d{0,19}$/.test(id) ? `/radio?track=${id}` : null;
+}
+
 /** "A, B", "A feat. B", "A ft B", "A (feat. B)" → "A". Ampersands stay ("Simon & Garfunkel"). */
 export function primaryArtistName(name: string): string {
 	const first = name.split(/\s*,\s*|\s+\(?(?:feat\.?|ft\.?|featuring)\s+/i)[0] ?? name;

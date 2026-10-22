@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { albumHref, artistHref, pickAlbumId, pickArtistId, primaryArtistName } from "./entity-links";
+import { albumHref, artistHref, pickAlbumId, pickArtistId, primaryArtistName, trackRadioHref } from "./entity-links";
 
 describe("artistHref", () => {
 	it("links by Deezer id when there is one", () => {
@@ -104,5 +104,19 @@ describe("pickAlbumId", () => {
 
 	it("returns null with no usable result", () => {
 		expect(pickAlbumId("x", "y", [])).toBeNull();
+	});
+});
+
+describe("trackRadioHref", () => {
+	it("links a catalogue Deezer track to its song radio", () => {
+		expect(trackRadioHref("3135556")).toBe("/radio?track=3135556");
+		expect(trackRadioHref(42)).toBe("/radio?track=42");
+	});
+
+	it("has no radio for user uploads (negative ids), 0 or no id", () => {
+		expect(trackRadioHref("-12345")).toBeNull();
+		expect(trackRadioHref("0")).toBeNull();
+		expect(trackRadioHref("")).toBeNull();
+		expect(trackRadioHref(null)).toBeNull();
 	});
 });
