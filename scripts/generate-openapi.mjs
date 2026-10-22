@@ -495,6 +495,48 @@ const schemas = {
 		},
 		["id", "userId", "trackId", "title", "artist", "album", "albumId", "coverUrl", "duration", "playedAt"]
 	),
+	AutoplayTrack: obj(
+		{
+			trackId: str({ description: "Deezer track id" }),
+			title: str(),
+			artist: str(),
+			artistId: nstr(),
+			album: nstr(),
+			albumId: nstr(),
+			cover: nstr(),
+			duration: nint({ description: "Seconds" }),
+		},
+		["trackId", "title", "artist", "artistId", "album", "albumId", "cover", "duration"]
+	),
+	DailyMix: obj(
+		{
+			day: str({ format: "date", description: "The user's day (YYYY-MM-DD)" }),
+			basedOn: str({ enum: ["taste", "flow"], description: "taste: the user's top artists of the day; flow: Deezer's Flow (no history yet)" }),
+			artists: arr(str(), { description: "The seed artists' names" }),
+			tracks: arr(ref("AutoplayTrack")),
+		},
+		["day", "basedOn", "artists", "tracks"]
+	),
+	ListenInput: obj(
+		{
+			trackId: str({ description: "Deezer track id" }),
+			artistId: nstr(),
+			albumId: nstr(),
+			startedAt: dt({ description: "When the sound started (or this part of the play)" }),
+			endedAt: ndt({ description: "Server clock when omitted; capped to now" }),
+			msPlayed: int({ minimum: 0, maximum: 86400000, description: "Time actually listened to (seeks and pauses excluded)" }),
+			durationMs: nint({ minimum: 1 }),
+			endReason: str({
+				enum: ["completed", "skipped", "stopped", "failed", "transferred", "closed"],
+				description:
+					"completed: ran to its end; skipped: the user moved to another track; stopped: playback cleared; failed: could not be played on; transferred: the sound moved to another Device; closed: the page or app went away mid-track.",
+			}),
+			client: str({ maxLength: 16, description: "web, android, ios…" }),
+			shuffle: bool({ default: false }),
+			source: nstr({ maxLength: 128, description: "Where the play was started from (radio, playlist…)" }),
+		},
+		["trackId", "startedAt", "msPlayed", "endReason", "client"]
+	),
 	RecentPlayInput: obj(
 		{
 			trackId: str(),
@@ -1295,6 +1337,78 @@ const paths = {
 		},
 	},
 
+	// ─── Autoplay ───
+	"/api/v1/autoplay": {
+		post: {
+			tags: ["Listens"],
+			operationId: "autoplay",
+			summary: "Tracks to append once the queue runs out (similar to the seeds)",
+			description:
+				"Mixes Deezer's radios of up to 3 seed artists (most recent seed first) with ListenBrainz / Last.fm tracks similar to the first seed (found back on Deezer). Leaves out the seeds, `exclude`, the tracks this user skips early more often than they listen to them, the artists they skipped early 3 times and never listened to, and anything played in the last 3 hours; at most 2 tracks per artist, never one artist twice in a row when it can be helped. Call it when the last track of the queue starts, and append with `source: \"autoplay\"`.",
+			security: userAuth,
+			requestBody: body(
+				obj(
+					{
+						seeds: arr(obj({ trackId: str(), artistId: nstr({ description: "Looked up when missing" }) }, ["trackId"]), {
+							minItems: 1,
+							maxItems: 5,
+							description: "Most recent first: the track playing, then the ones before it",
+						}),
+						exclude: arr(str(), { maxItems: 1000, description: "Track ids already queued" }),
+						limit: int({ minimum: 1, maximum: 50, default: 20 }),
+					},
+					["seeds"]
+				)
+			),
+			responses: {
+				...okRes("AutoplayEnvelope", obj({ tracks: arr(ref("AutoplayTrack")), seedArtistIds: arr(str()) }, ["tracks", "seedArtistIds"])),
+				...E_400,
+				...E_404,
+				502: err("DeezerUpstreamError"),
+				503: err("NoDeezer"),
+				...E_USER,
+			},
+			"x-error-codes": ["INVALID_BODY", "NOT_FOUND", "UPSTREAM_ERROR", "NO_DEEZER"],
+		},
+	},
+
+	// ─── Daily Mix ───
+	"/api/v1/mixes/daily": {
+		get: {
+			tags: ["Listens"],
+			operationId: "getDailyMix",
+			summary: "The user's Daily Mix of the day (home)",
+			description:
+				"Three of the user's top artists (listens + follows), a different three each day: about a third loved tracks by them (liked, recently played), the rest discoveries from their Deezer radios and ListenBrainz / Last.fm tracks similar to two loved ones, early skips left out, at most 3 per artist. With no history: the user's own Deezer Flow (never the service account's). Built on the first call of the day and cached until the day changes or `refresh=1`; yesterday's mix is served when today's can't be built. `tracks` is empty when there is nothing to build it from. Play its tracks with `source: \"daily-mix\"`.",
+			security: userAuth,
+			parameters: [
+				query("day", str({ format: "date" }), "The client's date (YYYY-MM-DD); the server's UTC date when missing"),
+				query("refresh", str({ enum: ["1"] }), "Build a new mix"),
+			],
+			responses: { ...okRes("DailyMixEnvelope", ref("DailyMix")), ...E_400, 503: err("NoDeezer"), ...E_USER },
+			"x-error-codes": ["INVALID_DAY", "NO_DEEZER"],
+		},
+	},
+
+	// ─── Listening log ───
+	"/api/v1/listens": {
+		post: {
+			tags: ["Listens"],
+			operationId: "logListens",
+			summary: "Append finished plays to the listening log (recommendation signals)",
+			description:
+				"One event per play, sent when it ends (a repeat or a closed app may report a play in parts). Events whose startedAt is more than 5 min ahead, more than 30 days old, or after their endedAt are dropped and counted in `dropped`.",
+			security: userAuth,
+			requestBody: body(obj({ events: arr(ref("ListenInput"), { minItems: 1, maxItems: 50 }) }, ["events"])),
+			responses: {
+				...okRes("ListensEnvelope", obj({ stored: int(), dropped: int() }, ["stored", "dropped"])),
+				...E_400,
+				...E_USER,
+			},
+			"x-error-codes": ["INVALID_BODY"],
+		},
+	},
+
 	// ─── Lyrics ───
 	"/api/v1/lyrics/{trackId}": {
 		parameters: [pathParam("trackId", "Deezer track id")],
@@ -1612,6 +1726,7 @@ const spec = {
 		{ name: "Library", description: "Liked tracks, saved albums, followed artists" },
 		{ name: "Playlists", description: "User playlists + Spotify import" },
 		{ name: "Recent plays", description: "Listening history (drives server-side file cache lifecycle)" },
+		{ name: "Listens", description: "Append-only listening log: one event per play, the recommendation signals" },
 		{ name: "Lyrics", description: "Synced (LRC) and plain lyrics" },
 		{ name: "Shares", description: "Public track share links" },
 		{ name: "Streaming", description: "Audio playback endpoints" },

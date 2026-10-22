@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, act, waitFor } from "@testing-library/react";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
-vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { error: vi.fn() }) }));
+vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { error: vi.fn(), dismiss: vi.fn() }) }));
 vi.mock("@/lib/audio-cache", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/audio-cache")>()),
 	getCachedBlobUrl: vi.fn(async () => null),
@@ -10,6 +10,7 @@ vi.mock("@/lib/audio-cache", async (importOriginal) => ({
 	removeCached: vi.fn(async () => {}),
 }));
 
+import { toast } from "sonner";
 import { AudioEngine } from "./AudioEngine";
 import { usePlayerStore, type PlayerTrack } from "@/stores/usePlayerStore";
 import { usePreviewStore } from "@/stores/usePreviewStore";
@@ -36,6 +37,8 @@ const ranges = (pairs: [number, number][] = []): Ranges => ({
 
 class FakeAudio extends EventTarget {
 	static all: FakeAudio[] = [];
+	/** The browser's autoplay policy refuses play() (a tab that never had a click). */
+	static blocked = false;
 	preload = "";
 	crossOrigin: string | null = null;
 	readyState = 0;
@@ -80,6 +83,7 @@ class FakeAudio extends EventTarget {
 	load() {}
 	play() {
 		this.plays++;
+		if (FakeAudio.blocked) return Promise.reject(new DOMException("play() needs a user gesture", "NotAllowedError"));
 		this.paused = false;
 		return Promise.resolve();
 	}
@@ -134,6 +138,7 @@ function elementWithSrc(pattern: RegExp): FakeAudio {
 
 beforeEach(() => {
 	FakeAudio.all = [];
+	FakeAudio.blocked = false;
 	vi.stubGlobal("Audio", FakeAudio);
 	stored = {};
 	fetchMock = vi.fn(async (input: RequestInfo | URL) => {
@@ -455,6 +460,98 @@ describe("AudioEngine — play count", () => {
 			el.tick(120.25);
 		});
 		expect(recentPlays()).toHaveLength(0);
+	});
+});
+
+describe("AudioEngine — listening log", () => {
+	type Sent = { events: { trackId: string; endReason: string; msPlayed: number; client: string; durationMs: number | null }[] };
+	const listens = () =>
+		fetchMock.mock.calls
+			.filter(([u]) => String(u) === "/api/v1/listens")
+			.flatMap(([, init]) => (JSON.parse(String((init as RequestInit).body)) as Sent).events);
+	const listenFor = (el: FakeAudio, seconds: number) =>
+		act(() => {
+			for (let t = 0; t <= seconds; t += 0.25) el.tick(t);
+		});
+
+	it("reports a track left for another one as skipped, with the time really listened to", async () => {
+		render(<AudioEngine />);
+		act(() => usePlayerStore.getState().playQueue([track("1"), track("2")], 0));
+		const el = await waitFor(() => elementWithSrc(/stream-progressive\/1$/));
+		act(() => el.ready(200));
+		act(() => el.fire("playing"));
+		listenFor(el, 10);
+		act(() => usePlayerStore.getState().next());
+		await waitFor(() => expect(listens()).toHaveLength(1));
+		expect(listens()[0]).toMatchObject({ trackId: "1", endReason: "skipped", msPlayed: 10_000, client: "web", durationMs: 200_000 });
+	});
+
+	it("reports a track that ran to its end as completed", async () => {
+		render(<AudioEngine />);
+		act(() => usePlayerStore.getState().playQueue([track("1"), track("2")], 0));
+		const el = await waitFor(() => elementWithSrc(/stream-progressive\/1$/));
+		act(() => el.ready(200));
+		act(() => el.fire("playing"));
+		listenFor(el, 5);
+		act(() => el.fire("ended"));
+		await waitFor(() => expect(listens()).toHaveLength(1));
+		expect(listens()[0]).toMatchObject({ trackId: "1", endReason: "completed" });
+	});
+
+	it("reports nothing for a track that never started playing", async () => {
+		render(<AudioEngine />);
+		act(() => usePlayerStore.getState().playQueue([track("1"), track("2")], 0));
+		await waitFor(() => elementWithSrc(/stream-progressive\/1$/));
+		act(() => usePlayerStore.getState().next());
+		await waitFor(() => elementWithSrc(/stream-progressive\/2$/));
+		expect(listens()).toEqual([]);
+	});
+
+	it("reports each time round of a repeated track", async () => {
+		render(<AudioEngine />);
+		act(() => usePlayerStore.getState().play(track("1")));
+		act(() => usePlayerStore.setState({ repeat: "one" }));
+		const el = await waitFor(() => elementWithSrc(/stream-progressive\/1$/));
+		act(() => el.ready(200));
+		act(() => el.fire("playing"));
+		listenFor(el, 3);
+		act(() => el.fire("ended"));
+		listenFor(el, 2);
+		act(() => el.fire("ended"));
+		expect(listens().map((l) => [l.endReason, l.msPlayed])).toEqual([
+			["completed", 3000],
+			["completed", 2000],
+		]);
+	});
+
+	it("reports the part played so far when the page goes away", async () => {
+		render(<AudioEngine />);
+		act(() => usePlayerStore.getState().play(track("1")));
+		const el = await waitFor(() => elementWithSrc(/stream-progressive\/1$/));
+		act(() => el.ready(200));
+		act(() => el.fire("playing"));
+		listenFor(el, 4);
+		act(() => {
+			window.dispatchEvent(new Event("pagehide"));
+		});
+		expect(listens()).toMatchObject([{ trackId: "1", endReason: "closed", msPlayed: 4000 }]);
+		// Nothing played since: the same part is not sent twice.
+		act(() => {
+			window.dispatchEvent(new Event("pagehide"));
+		});
+		expect(listens()).toHaveLength(1);
+	});
+
+	it("reports a play whose sound moved to another Device as transferred", async () => {
+		render(<AudioEngine />);
+		act(() => usePlayerStore.getState().play(track("1")));
+		const el = await waitFor(() => elementWithSrc(/stream-progressive\/1$/));
+		act(() => el.ready(200));
+		act(() => el.fire("playing"));
+		listenFor(el, 6);
+		act(() => useSyncStore.getState().set({ role: "remote" }));
+		expect(listens()).toMatchObject([{ trackId: "1", endReason: "transferred", msPlayed: 6000 }]);
+		useSyncStore.getState().reset();
 	});
 });
 
@@ -851,6 +948,33 @@ describe("AudioEngine — multi-device", () => {
 		act(() => el.ready(200));
 		expect(el.currentTime).toBeCloseTo(42);
 		expect(el.plays).toBe(1);
+	});
+
+	it("a Transfer to a tab the browser won't let play pauses and asks for a click (was: shown playing, no sound)", async () => {
+		stored["1"] = "https://r2.example/tracks/1/1.mp3?sig=1";
+		useSyncStore.getState().set({ role: "remote" });
+		usePlayerStore.setState({ currentTrack: track("1"), queue: [track("1")], queueIndex: 0, isPlaying: true, currentTime: 42 });
+		render(<AudioEngine />);
+		FakeAudio.blocked = true;
+		act(() => useSyncStore.getState().set({ role: "active" }));
+		const el = await waitFor(() => elementWithSrc(/r2\.example\/tracks\/1\//));
+		el.seekable = ranges([[0, 200]]);
+		await act(async () => el.ready(200));
+		expect(usePlayerStore.getState().isPlaying).toBe(false);
+		expect(toast).toHaveBeenCalledWith(
+			"Click to play here",
+			expect.objectContaining({ id: "play-blocked", action: expect.objectContaining({ label: "Play" }) })
+		);
+
+		// The prompt's button is the click the browser wants.
+		FakeAudio.blocked = false;
+		const [, opts] = vi.mocked(toast).mock.calls.find(([title]) => title === "Click to play here")!;
+		const plays = el.plays;
+		await act(async () => (opts as unknown as { action: { onClick: () => void } }).action.onClick());
+		expect(usePlayerStore.getState().isPlaying).toBe(true);
+		expect(el.plays).toBe(plays + 1);
+		expect(el.paused).toBe(false);
+		expect(toast.dismiss).toHaveBeenCalledWith("play-blocked");
 	});
 
 	it("a Preview on a Remote pauses the Active Device, which stays paused afterwards (CONTEXT.md, Preview)", async () => {

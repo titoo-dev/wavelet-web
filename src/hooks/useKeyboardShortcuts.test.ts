@@ -4,6 +4,8 @@ import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { useCommandStore } from "@/stores/useCommandStore";
 import { usePlayerStore } from "@/stores/usePlayerStore";
 import { useLyricsStore } from "@/stores/useLyricsStore";
+import { setRemoteSender } from "@/lib/playback-sync/remote";
+import { useSyncStore } from "@/lib/playback-sync/useSyncStore";
 
 const CMD = useCommandStore.getState();
 const PLAYER = usePlayerStore.getState();
@@ -85,6 +87,22 @@ describe("useKeyboardShortcuts — page scrolling (NAV-01)", () => {
 		expect(up.defaultPrevented).toBe(false);
 		expect(down.defaultPrevented).toBe(false);
 		expect(usePlayerStore.getState().volume).toBe(50);
+	});
+
+	it("Shift+ArrowUp on a Remote steps the Active Device's volume (was: from this tab's own, a jump)", () => {
+		const sent: unknown[] = [];
+		setRemoteSender((c) => sent.push(c));
+		useSyncStore.getState().set({
+			role: "remote",
+			activeDeviceId: "phone",
+			devices: [{ deviceId: "phone", name: "Pixel", platform: "android", activated: true, volume: 0.2, lastSeen: 0 }],
+		});
+		usePlayerStore.setState({ currentTrack: track, isPlaying: true, volume: 80 });
+		renderHook(() => useKeyboardShortcuts());
+		press("ArrowUp", { shiftKey: true });
+		expect(sent).toEqual([{ type: "setVolume", volume: 0.25 }]);
+		setRemoteSender(null);
+		useSyncStore.getState().reset();
 	});
 
 	it("Shift+ArrowUp / Shift+ArrowDown change the volume", () => {

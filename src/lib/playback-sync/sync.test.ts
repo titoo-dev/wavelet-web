@@ -4,9 +4,16 @@ vi.mock("@/utils/haptic", () => ({ haptic: vi.fn() }));
 
 import { usePlayerStore, type PlayerTrack } from "@/stores/usePlayerStore";
 import { isRemote, setRemoteSender } from "./remote";
-import { HEARTBEAT_MS, PlaybackSync, POSITION_REFRESH_MS, UNRESPONSIVE_MS } from "./sync";
+import {
+	HEARTBEAT_MS,
+	PlaybackSync,
+	POSITION_REFRESH_MS,
+	UNRESPONSIVE_MS,
+	VOLUME_HOLD_MS,
+	VOLUME_THROTTLE_MS,
+} from "./sync";
 import { toSessionTrack } from "./track";
-import { useSyncStore } from "./useSyncStore";
+import { shownVolume, useSyncStore } from "./useSyncStore";
 import type {
 	DeviceView,
 	OutstandingCommand,
@@ -187,10 +194,64 @@ describe("Remote", () => {
 		expect(p.currentTrack?.trackId).toBe("2");
 	});
 
+	it("a Remote's volume shows at once and goes out at most every throttle step (was: one Command per slider step, the slider jumped back)", async () => {
+		asRemote();
+		expect(shownVolume()).toBe(40);
+		const sentVolumes = () =>
+			client.send.mock.calls
+				.map((c) => (c as unknown[])[1] as { type: string; volume?: number })
+				.filter((c) => c.type === "setVolume")
+				.map((c) => c.volume);
+		usePlayerStore.getState().setVolume(50);
+		usePlayerStore.getState().setVolume(60);
+		usePlayerStore.getState().setVolume(70);
+		expect(shownVolume()).toBe(70);
+		expect(sentVolumes()).toEqual([0.5]);
+		await flush(VOLUME_THROTTLE_MS + 10);
+		expect(sentVolumes()).toEqual([0.5, 0.7]);
+		// A heartbeat from the middle of the drag doesn't pull the slider back.
+		client.devicesCb([device("phone", { name: "Pixel", volume: 0.5 }), device(ME)]);
+		expect(shownVolume()).toBe(70);
+		// Once the drag is over, the Active Device's own word wins.
+		client.devicesCb([device("phone", { name: "Pixel", volume: 0.68 }), device(ME)]);
+		await flush(VOLUME_HOLD_MS);
+		expect(shownVolume()).toBe(68);
+		expect(usePlayerStore.getState().volume).toBe(80);
+	});
+
+	it("mute on a Remote starts from the volume just set (was: from the last heartbeat)", async () => {
+		asRemote();
+		usePlayerStore.getState().setVolume(0);
+		await flush(VOLUME_THROTTLE_MS + 10);
+		usePlayerStore.getState().toggleMute();
+		await flush(VOLUME_THROTTLE_MS + 10);
+		expect(client.send).toHaveBeenLastCalledWith(ME, { type: "setVolume", volume: 0.4 });
+		expect(shownVolume()).toBe(40);
+	});
+
 	it("moves the position on while the Active Device plays", async () => {
 		asRemote();
 		await vi.advanceTimersByTimeAsync(1_000);
 		expect(usePlayerStore.getState().currentTime).toBeCloseTo(31);
+	});
+
+	it("extrapolates a snapshot met on reconnect from when it was true (was: up to 15 s behind the Active Device)", async () => {
+		start();
+		// The server's clock runs 7 min ahead of this one; this tab's heartbeat just landed.
+		const server = Date.now() + 7 * 60_000;
+		client.devicesCb([device("phone", { lastSeen: server - 3_000 }), device(ME, { lastSeen: server })]);
+		client.queueCb({ tracks: [t("1"), t("2"), t("3")].map(toSessionTrack), windowStart: 0, version: 1 });
+		// Back from the background: the last publish, made 12 s ago, arrives only now.
+		client.sessionCb(
+			session({
+				activeDeviceId: "phone",
+				state: state({ index: 1, currentTrack: toSessionTrack(t("2")), isPlaying: true, positionMs: 30_000 }),
+				positionAt: server - 12_000,
+			})
+		);
+		expect(usePlayerStore.getState().currentTime).toBeCloseTo(42);
+		await vi.advanceTimersByTimeAsync(2_000);
+		expect(usePlayerStore.getState().currentTime).toBeCloseTo(44);
 	});
 
 	it("stops moving it when the session pauses", async () => {

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronRight, CloudDownload, Info, LogOut, Monitor, Moon, Sun, TriangleAlert, Volume2, Waves } from "lucide-react";
+import { ChevronRight, CloudDownload, Info, LogOut, Monitor, Moon, Sparkles, Sun, TriangleAlert, Volume2, Waves } from "lucide-react";
 import { AudioCacheManager } from "@/components/audio/AudioCacheManager";
 import { usePlayerStore } from "@/stores/usePlayerStore";
 import { useAuthStore } from "@/stores/useAuthStore";
@@ -85,6 +85,8 @@ export default function SettingsPage() {
 	const setCrossfadeDuration = usePlayerStore((s) => s.setCrossfadeDuration);
 	const gapless = usePlayerStore((s) => s.gapless);
 	const toggleGapless = usePlayerStore((s) => s.toggleGapless);
+	const autoplay = usePlayerStore((s) => s.autoplay);
+	const toggleAutoplay = usePlayerStore((s) => s.toggleAutoplay);
 
 	const user = useAuthStore((s) => s.user);
 	const deezerUser = useAuthStore((s) => s.deezerUser);
@@ -181,6 +183,15 @@ export default function SettingsPage() {
 									checked={gapless}
 									onCheckedChange={() => toggleGapless()}
 								/>
+									{signedIn && (
+										<SettingsSwitchTile
+											icon={Sparkles}
+											title="Autoplay"
+											subtitle="When your queue ends, keep playing similar tracks."
+											checked={autoplay}
+											onCheckedChange={() => toggleAutoplay()}
+										/>
+									)}
 									<AudioCacheManager />
 								</SettingsSection>
 							</div>

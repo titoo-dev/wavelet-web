@@ -4,6 +4,7 @@
 // forget to reset one of them: starting a track = replacing the session.
 
 import { isPreviewSource } from "@/lib/seek";
+import type { ListenEndReason, ListenInput } from "@/lib/listens";
 
 /** Spotify rule: a play counts once this much of the track was listened to. */
 export const PLAY_THRESHOLD_SECONDS = 30;
@@ -28,9 +29,31 @@ export interface TrackSession {
 	playedFrom: string | null;
 	/** The engine gave up on this track (retries exhausted). */
 	failed: boolean;
+	/** The track ran to its end (ended event, crossfade or gapless hand-over). */
+	ended: boolean;
+	/** Ids and duration sent with the listen (POST /listens). */
+	readonly meta: ListenMeta;
+	/** Start of the play not yet reported to the listening log (epoch ms). */
+	listenStartedAt: number;
+	/** `listened` already reported (a repeat or a closed page reports a part). */
+	listenReported: number;
+	/** A part of this play was reported already. */
+	reportedOnce: boolean;
 }
 
-export function createTrackSession(trackId: string, opts: { autoAdvance?: boolean } = {}): TrackSession {
+export interface ListenMeta {
+	artistId?: string | null;
+	albumId?: string | null;
+	/** Seconds, as the player store has it. */
+	duration?: number | null;
+	/** How the track got into the queue ("autoplay"…). */
+	source?: string | null;
+}
+
+export function createTrackSession(
+	trackId: string,
+	opts: { autoAdvance?: boolean; meta?: ListenMeta; now?: number } = {}
+): TrackSession {
 	return {
 		trackId,
 		autoAdvance: !!opts.autoAdvance,
@@ -42,7 +65,56 @@ export function createTrackSession(trackId: string, opts: { autoAdvance?: boolea
 		lastPosition: null,
 		playedFrom: null,
 		failed: false,
+		ended: false,
+		meta: opts.meta ?? {},
+		listenStartedAt: opts.now ?? Date.now(),
+		listenReported: 0,
+		reportedOnce: false,
 	};
+}
+
+/**
+ * Why the current track's play is over when another track takes its place:
+ * it failed, it ran to its end, or the user moved on.
+ */
+export function endReasonOf(session: TrackSession): ListenEndReason {
+	if (session.failed) return "failed";
+	return session.ended ? "completed" : "skipped";
+}
+
+/**
+ * The listen to report for the part of this play not reported yet, then
+ * start a new part (a repeat of the same track, or the page coming back
+ * from the bfcache, reports separately). Null when the track never started
+ * playing, or when nothing was played since the last report.
+ */
+export function takeListen(
+	session: TrackSession | null,
+	reason: ListenEndReason,
+	opts: { client: string; shuffle: boolean; now?: number }
+): ListenInput | null {
+	if (!session || session.playedFrom === null) return null;
+	const now = opts.now ?? Date.now();
+	const played = Math.max(0, session.listened - session.listenReported);
+	if (session.reportedOnce && played === 0) return null;
+	const { artistId, albumId, duration, source } = session.meta;
+	const listen: ListenInput = {
+		trackId: session.trackId,
+		artistId: artistId ?? null,
+		albumId: albumId ?? null,
+		startedAt: new Date(session.listenStartedAt).toISOString(),
+		endedAt: new Date(now).toISOString(),
+		msPlayed: Math.round(played * 1000),
+		durationMs: duration && duration > 0 ? Math.round(duration * 1000) : null,
+		endReason: reason,
+		client: opts.client,
+		shuffle: opts.shuffle,
+		source: source ?? null,
+	};
+	session.listenReported = session.listened;
+	session.listenStartedAt = now;
+	session.reportedOnce = true;
+	return listen;
 }
 
 /** Longest gap between two timeupdates still counted as continuous playback. */

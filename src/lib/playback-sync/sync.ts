@@ -1,7 +1,7 @@
 import { usePlayerStore } from "@/stores/usePlayerStore";
 import { executeCommand } from "./execute";
 import { setRemoteSender, setRemoteVolume } from "./remote";
-import { extrapolate, toPlayerTrack, toSession } from "./track";
+import { extrapolate, ServerClock, toPlayerTrack, toSession } from "./track";
 import { useSyncStore } from "./useSyncStore";
 import type {
 	Command,
@@ -25,6 +25,10 @@ export const UNRESPONSIVE_MS = 5_000;
 const TICK_MS = 250;
 /** Store changes within this window go out as one publish. */
 const PUBLISH_DEBOUNCE_MS = 50;
+/** A Remote's volume Commands go out at most this often while a slider is dragged. */
+export const VOLUME_THROTTLE_MS = 150;
+/** A Remote shows the volume it set for this long, then the Active Device's own report. */
+export const VOLUME_HOLD_MS = 1_500;
 
 export interface SyncOptions {
 	client: SyncClient;
@@ -48,8 +52,8 @@ type PlayerSnapshot = ReturnType<typeof usePlayerStore.getState>;
 export class PlaybackSync {
 	private role: PlaybackRole = "local";
 	private session: SessionView | null = null;
-	/** Local time the current session snapshot arrived: Remotes extrapolate from it. */
-	private sessionAnchor = 0;
+	/** Places the session's `positionAt` on this tab's clock: Remotes extrapolate from it. */
+	private readonly serverClock = new ServerClock();
 	private queueDoc: QueueView | null = null;
 	private devices: DeviceView[] = [];
 	private pending: PendingCommand[] = [];
@@ -62,6 +66,9 @@ export class PlaybackSync {
 	private publishTimer: ReturnType<typeof setTimeout> | null = null;
 	private publishQueue = false;
 	private volumeTimer: ReturnType<typeof setTimeout> | null = null;
+	private volumeSendTimer: ReturnType<typeof setTimeout> | null = null;
+	private volumeDirty = false;
+	private volumeHoldTimer: ReturnType<typeof setTimeout> | null = null;
 	private ticker: ReturnType<typeof setInterval> | null = null;
 	private readonly intervals: ReturnType<typeof setInterval>[] = [];
 	private readonly unsubs: (() => void)[] = [];
@@ -107,6 +114,8 @@ export class PlaybackSync {
 		this.intervals.splice(0).forEach(clearInterval);
 		if (this.publishTimer) clearTimeout(this.publishTimer);
 		if (this.volumeTimer) clearTimeout(this.volumeTimer);
+		if (this.volumeSendTimer) clearTimeout(this.volumeSendTimer);
+		this.clearPendingVolume();
 		this.stopTicker();
 		void this.opts.client.leave(this.opts.deviceId).catch(() => {});
 		this.setRole("local");
@@ -135,8 +144,12 @@ export class PlaybackSync {
 	private onSession(s: SessionView | null) {
 		const me = this.opts.deviceId;
 		this.session = s;
-		this.sessionAnchor = this.now();
+		if (s) this.serverClock.observe(s.positionAt, this.now());
 		useSyncStore.getState().set({ activeDeviceId: s?.activeDeviceId ?? null });
+		// The devices may have come first: the mute toggle starts from the new Active Device's volume.
+		if (useSyncStore.getState().pendingVolume === null) {
+			setRemoteVolume(this.devices.find((d) => d.deviceId === s?.activeDeviceId)?.volume ?? null);
+		}
 
 		if (!s) {
 			// Nobody ever wrote a session: this Device's own player seeds it.
@@ -185,10 +198,53 @@ export class PlaybackSync {
 	}
 
 	private onDevices(devices: DeviceView[]) {
+		// The latest heartbeat (this tab's own, just after it sends one) tells the server's time.
+		if (devices.length) this.serverClock.observe(Math.max(...devices.map((d) => d.lastSeen)), this.now());
 		this.devices = devices;
 		useSyncStore.getState().set({ devices });
 		const active = devices.find((d) => d.deviceId === this.session?.activeDeviceId);
-		setRemoteVolume(active?.volume ?? null);
+		// Mid-drag, the heartbeats lag behind what was just set here.
+		if (useSyncStore.getState().pendingVolume === null) setRemoteVolume(active?.volume ?? null);
+	}
+
+	/**
+	 * Like Spotify Connect: the slider follows the finger at once, the Active Device gets a Command
+	 * at most every VOLUME_THROTTLE_MS (the last value always goes out), and its own reports, a step
+	 * behind during a drag, don't pull the slider back for VOLUME_HOLD_MS.
+	 */
+	private setRemoteVolumeTo(volume: number) {
+		const v = Math.max(0, Math.min(1, volume));
+		useSyncStore.getState().set({ pendingVolume: v });
+		setRemoteVolume(v);
+		if (this.volumeHoldTimer) clearTimeout(this.volumeHoldTimer);
+		this.volumeHoldTimer = setTimeout(() => {
+			this.clearPendingVolume();
+			const active = this.devices.find((d) => d.deviceId === this.session?.activeDeviceId);
+			setRemoteVolume(active?.volume ?? null);
+		}, VOLUME_HOLD_MS);
+		if (this.volumeSendTimer) {
+			this.volumeDirty = true;
+			return;
+		}
+		this.sendVolume();
+	}
+
+	private sendVolume() {
+		const v = useSyncStore.getState().pendingVolume;
+		if (v === null) return;
+		this.volumeDirty = false;
+		this.sendCommand({ type: "setVolume", volume: v });
+		this.volumeSendTimer = setTimeout(() => {
+			this.volumeSendTimer = null;
+			if (this.volumeDirty) this.sendVolume();
+		}, VOLUME_THROTTLE_MS);
+	}
+
+	private clearPendingVolume() {
+		if (this.volumeHoldTimer) clearTimeout(this.volumeHoldTimer);
+		this.volumeHoldTimer = null;
+		this.volumeDirty = false;
+		if (useSyncStore.getState().pendingVolume !== null) useSyncStore.getState().set({ pendingVolume: null });
 	}
 
 	/** Copies the session into the player store (Remote, idle, or right after a Transfer here). */
@@ -196,7 +252,7 @@ export class PlaybackSync {
 		const s = this.session;
 		if (!s) return;
 		const { state } = s;
-		const position = extrapolate(state, this.sessionAnchor, this.now());
+		const position = this.position(state, s.positionAt);
 		const local = usePlayerStore.getState();
 		const queue = this.queueDoc ? this.queueDoc.tracks.map(toPlayerTrack) : local.queue;
 		const currentTrack = state.currentTrack ? toPlayerTrack(state.currentTrack) : null;
@@ -219,6 +275,11 @@ export class PlaybackSync {
 				: {}),
 		});
 		this.updateTicker();
+	}
+
+	/** Where the session's position, true at server time `positionAt`, is now (seconds). */
+	private position(state: SessionView["state"], positionAt: number): number {
+		return extrapolate(state, this.serverClock.toLocal(positionAt), this.now());
 	}
 
 	private write(patch: Partial<PlayerSnapshot>) {
@@ -383,7 +444,11 @@ export class PlaybackSync {
 		if (this.role === role) return;
 		const was = this.role;
 		this.role = role;
-		setRemoteSender(role === "remote" ? (c) => this.sendCommand(c) : null);
+		setRemoteSender(
+			role === "remote" ? (c) => (c.type === "setVolume" ? this.setRemoteVolumeTo(c.volume) : this.sendCommand(c)) : null
+		);
+		// A volume set for another Device means nothing once this one plays or nobody does.
+		this.clearPendingVolume();
 		useSyncStore.getState().set({ role });
 		this.updateTicker();
 		if (role === "active") this.runPending();
@@ -421,7 +486,7 @@ export class PlaybackSync {
 			this.ticker = setInterval(() => {
 				const s = this.session;
 				if (!s) return;
-				this.write({ currentTime: extrapolate(s.state, this.sessionAnchor, this.now()) });
+				this.write({ currentTime: this.position(s.state, s.positionAt) });
 			}, TICK_MS);
 		} else if (!want) {
 			this.stopTicker();

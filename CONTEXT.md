@@ -39,7 +39,7 @@ A **Device** that has shown a sign of life recently enough to appear in the devi
 _Avoid_: Connected, available
 
 **Activated Device**:
-An **Online Device** that is allowed to output sound right now. Native apps always are; a browser tab becomes one after its first click or key press. Only **Activated Devices** can be picked for a **Transfer**; others are listed with a hint to activate them.
+An **Online Device** that is allowed to output sound right now. Native apps always are; a browser tab becomes one after its first click or key press. Any **Online Device** can be picked for a **Transfer**: a tab that is not yet an **Activated Device** is listed with a hint, and if its browser refuses to play it pauses and asks for a click ("Click to play here").
 _Avoid_: Ready, unlocked
 
 ### Outside the Playback Session

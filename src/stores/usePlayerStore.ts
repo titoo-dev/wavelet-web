@@ -14,6 +14,8 @@ export interface PlayerTrack {
 	albumId?: string | null;
 	cover: string | null;
 	duration: number | null;
+	/** How the track got into the queue: "autoplay" for tracks added once the queue ran out. */
+	source?: string | null;
 }
 
 type RepeatMode = "off" | "all" | "one";
@@ -60,6 +62,8 @@ interface PlayerState {
 	normalizationEnabled: boolean;
 	/** Sample-accurate transitions between cached MP3 tracks (MSE deck); off by default. Not with crossfade. */
 	gapless: boolean;
+	/** Similar tracks are added when the last track of the queue starts (useAutoplay); on by default. */
+	autoplay: boolean;
 
 	play: (track: PlayerTrack, queue?: PlayerTrack[]) => void;
 	pause: () => void;
@@ -92,6 +96,7 @@ interface PlayerState {
 	setCrossfadeDuration: (seconds: number) => void;
 	toggleNormalization: () => void;
 	toggleGapless: () => void;
+	toggleAutoplay: () => void;
 
 	// Queue management (P2)
 	/** Insert a track right after the current track ("Play Next"). */
@@ -108,6 +113,12 @@ interface PlayerState {
 	moveInQueue: (from: number, to: number) => void;
 	/** Clear the queue except the currently playing track. */
 	clearQueue: () => void;
+	/**
+	 * Append autoplay tracks after `afterTrackId`, only while it is still the
+	 * last track of the queue (the queue may have moved during the request).
+	 * Returns how many were added.
+	 */
+	appendAutoplay: (tracks: PlayerTrack[], afterTrackId: string) => number;
 }
 
 /** Navigate to a queue index, setting it as the current track. */
@@ -171,6 +182,7 @@ export const usePlayerStore = create<PlayerState>()(
 			crossfadeDuration: 0,
 			normalizationEnabled: false,
 			gapless: false,
+			autoplay: true,
 
 			play: (track, queue) => {
 				const state = get();
@@ -402,6 +414,7 @@ export const usePlayerStore = create<PlayerState>()(
 			setCrossfadeDuration: (crossfadeDuration) => set({ crossfadeDuration }),
 			toggleNormalization: () => set((s) => ({ normalizationEnabled: !s.normalizationEnabled })),
 			toggleGapless: () => set((s) => ({ gapless: !s.gapless })),
+			toggleAutoplay: () => set((s) => ({ autoplay: !s.autoplay })),
 			toggleRepeat: () => {
 				const current = get().repeat;
 				const repeat: RepeatMode = current === "off" ? "all" : current === "all" ? "one" : "off";
@@ -527,6 +540,20 @@ export const usePlayerStore = create<PlayerState>()(
 					queueIndex: 0,
 				});
 			},
+
+			appendAutoplay: (tracks, afterTrackId) => {
+				const { queue, repeat } = get();
+				if (isRemote() || repeat !== "off" || queue.at(-1)?.trackId !== afterTrackId) return 0;
+				const queued = new Set(queue.map((t) => t.trackId));
+				const added: PlayerTrack[] = [];
+				for (const t of tracks) {
+					if (queued.has(t.trackId)) continue;
+					queued.add(t.trackId);
+					added.push({ ...t, source: "autoplay" });
+				}
+				if (added.length > 0) set({ queue: [...queue, ...added] });
+				return added.length;
+			},
 		}),
 		{
 			name: "wavelet-player",
@@ -543,6 +570,7 @@ export const usePlayerStore = create<PlayerState>()(
 				crossfadeDuration: state.crossfadeDuration,
 				normalizationEnabled: state.normalizationEnabled,
 				gapless: state.gapless,
+				autoplay: state.autoplay,
 			}),
 		}
 	)

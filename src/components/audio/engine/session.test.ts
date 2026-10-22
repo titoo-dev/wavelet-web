@@ -6,6 +6,8 @@ import {
 	claimBackgroundPersist,
 	reachedPlayThreshold,
 	createTrackSession,
+	endReasonOf,
+	takeListen,
 	shouldNotifySkip,
 	startVolume,
 } from "./session";
@@ -143,5 +145,70 @@ describe("advanceQueue", () => {
 		const flag = { current: true };
 		advanceQueue(flag, false, store([{ id: 1 }, { id: 2 }]));
 		expect(flag.current).toBe(false);
+	});
+});
+
+describe("listening log", () => {
+	const T0 = Date.parse("2026-10-20T10:00:00Z");
+	const opts = { client: "web", shuffle: false };
+	const playing = () => {
+		const s = createTrackSession("7", { meta: { artistId: "27", albumId: "9", duration: 200 }, now: T0 });
+		s.playedFrom = "https://r2.example/tracks/7/1.mp3";
+		return s;
+	};
+
+	it("ends as failed, completed or skipped", () => {
+		const s = createTrackSession("7");
+		expect(endReasonOf(s)).toBe("skipped");
+		s.ended = true;
+		expect(endReasonOf(s)).toBe("completed");
+		s.failed = true;
+		expect(endReasonOf(s)).toBe("failed");
+	});
+
+	it("reports nothing for a track that never started playing", () => {
+		expect(takeListen(createTrackSession("7"), "skipped", opts)).toBeNull();
+		expect(takeListen(null, "skipped", opts)).toBeNull();
+	});
+
+	it("reports the time listened to, the ids and the duration in ms", () => {
+		const s = playing();
+		s.listened = 12.3456;
+		expect(takeListen(s, "skipped", { ...opts, now: T0 + 20_000 })).toEqual({
+			trackId: "7",
+			artistId: "27",
+			albumId: "9",
+			startedAt: "2026-10-20T10:00:00.000Z",
+			endedAt: "2026-10-20T10:00:20.000Z",
+			msPlayed: 12_346,
+			durationMs: 200_000,
+			endReason: "skipped",
+			client: "web",
+			shuffle: false,
+			source: null,
+		});
+	});
+
+	it("reports a play in parts: each part only what was played since the last one", () => {
+		const s = playing();
+		s.listened = 10;
+		takeListen(s, "closed", { ...opts, now: T0 + 10_000 });
+		expect(takeListen(s, "closed", { ...opts, now: T0 + 11_000 })).toBeNull();
+		s.listened = 15;
+		expect(takeListen(s, "completed", { ...opts, now: T0 + 16_000 })).toMatchObject({
+			startedAt: "2026-10-20T10:00:10.000Z",
+			msPlayed: 5000,
+			endReason: "completed",
+		});
+	});
+
+	it("reports an instant skip (0 ms) the first time", () => {
+		expect(takeListen(playing(), "skipped", opts)).toMatchObject({ msPlayed: 0 });
+	});
+
+	it("sends no duration when the track has none", () => {
+		const s = createTrackSession("7", { meta: { duration: 0 } });
+		s.playedFrom = "x";
+		expect(takeListen(s, "stopped", opts)?.durationMs).toBeNull();
 	});
 });

@@ -31,7 +31,7 @@ export const queueOf = query({
 
 type Rejection = {
 	ok: false;
-	reason: "not-active" | "offline" | "not-activated" | "unknown-device";
+	reason: "not-active" | "offline" | "unknown-device";
 	activeDeviceId: string | null;
 };
 type Accepted = { ok: true; queueVersion: number };
@@ -113,7 +113,8 @@ export const reclaim = mutation({
 /**
  * Move the sound to `targetDeviceId` (CONTEXT.md, Transfer). The intent is kept: a paused session
  * stays paused, a playing one carries on from the same position. Commands the previous Active
- * Device had not carried out are dropped.
+ * Device had not carried out are dropped. A tab that never had a click is accepted: if its browser
+ * refuses to play, it pauses and asks for that click (CONTEXT.md, Activated Device).
  */
 export const transfer = mutation({
 	args: { targetDeviceId: v.string() },
@@ -128,7 +129,6 @@ export const transfer = mutation({
 		});
 		if (!target) return refuse("unknown-device");
 		if (!target.online) return refuse("offline");
-		if (!target.activated) return refuse("not-activated");
 		if (session.activeDeviceId === targetDeviceId) return { ok: true, queueVersion: session.queueVersion };
 		const previous = session.activeDeviceId;
 		const state = { ...session.state, positionMs: positionAt(session, Date.now()) };

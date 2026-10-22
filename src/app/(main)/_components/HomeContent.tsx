@@ -38,6 +38,7 @@ import {
 	entrance,
 } from "@/components/expressive";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DailyMixCard } from "./DailyMixCard";
 
 export interface UserPlaylist {
 	id: string;
@@ -499,6 +500,7 @@ export function HomeContent({ playlists, albums, recentPlays, tracks, user }: Ho
 									))}
 								</div>
 							)}
+							<DailyMixCard />
 						</>
 					)}
 

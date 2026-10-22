@@ -241,16 +241,11 @@ describe("transfer", () => {
 		expect(await alice.query(api.commands.pending, { deviceId: "tab" })).toEqual([]);
 	});
 
-	it("refuses an unknown, offline or not activated Device", async () => {
-		const { alice, online } = await playingOnTab();
+	it("refuses an unknown or offline Device", async () => {
+		const { alice } = await playingOnTab();
 		expect(await alice.mutation(api.playback.transfer, { targetDeviceId: "ghost" })).toMatchObject({
 			ok: false,
 			reason: "unknown-device",
-		});
-		await online(alice, "fresh-tab", false);
-		expect(await alice.mutation(api.playback.transfer, { targetDeviceId: "fresh-tab" })).toMatchObject({
-			ok: false,
-			reason: "not-activated",
 		});
 		await alice.mutation(api.devices.leave, { deviceId: "phone" });
 		expect(await alice.query(api.playback.session, {})).toMatchObject({ activeDeviceId: "tab" });
@@ -259,6 +254,13 @@ describe("transfer", () => {
 			reason: "offline",
 			activeDeviceId: "tab",
 		});
+	});
+
+	it("moves the sound to a tab that never had a click, which asks for one if its browser won't play (was: refused, the phone could not pick the PC)", async () => {
+		const { alice, online } = await playingOnTab();
+		await online(alice, "fresh-tab", false);
+		expect(await alice.mutation(api.playback.transfer, { targetDeviceId: "fresh-tab" })).toMatchObject({ ok: true });
+		expect(await alice.query(api.playback.session, {})).toMatchObject({ activeDeviceId: "fresh-tab" });
 	});
 
 	it("is a no-op toward the Device already active", async () => {

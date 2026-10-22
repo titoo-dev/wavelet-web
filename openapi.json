@@ -45,6 +45,10 @@
 			"description": "Listening history (drives server-side file cache lifecycle)"
 		},
 		{
+			"name": "Listens",
+			"description": "Append-only listening log: one event per play, the recommendation signals"
+		},
+		{
 			"name": "Lyrics",
 			"description": "Synced (LRC) and plain lyrics"
 		},
@@ -2726,6 +2730,246 @@
 				}
 			}
 		},
+		"/api/v1/autoplay": {
+			"post": {
+				"tags": [
+					"Listens"
+				],
+				"operationId": "autoplay",
+				"summary": "Tracks to append once the queue runs out (similar to the seeds)",
+				"description": "Mixes Deezer's radios of up to 3 seed artists (most recent seed first) with ListenBrainz / Last.fm tracks similar to the first seed (found back on Deezer). Leaves out the seeds, `exclude`, the tracks this user skips early more often than they listen to them, the artists they skipped early 3 times and never listened to, and anything played in the last 3 hours; at most 2 tracks per artist, never one artist twice in a row when it can be helped. Call it when the last track of the queue starts, and append with `source: \"autoplay\"`.",
+				"security": [
+					{
+						"bearerAuth": []
+					},
+					{
+						"sessionCookie": []
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"seeds": {
+										"type": "array",
+										"items": {
+											"type": "object",
+											"properties": {
+												"trackId": {
+													"type": "string"
+												},
+												"artistId": {
+													"type": "string",
+													"nullable": true,
+													"description": "Looked up when missing"
+												}
+											},
+											"required": [
+												"trackId"
+											]
+										},
+										"minItems": 1,
+										"maxItems": 5,
+										"description": "Most recent first: the track playing, then the ones before it"
+									},
+									"exclude": {
+										"type": "array",
+										"items": {
+											"type": "string"
+										},
+										"maxItems": 1000,
+										"description": "Track ids already queued"
+									},
+									"limit": {
+										"type": "integer",
+										"minimum": 1,
+										"maximum": 50,
+										"default": 20
+									}
+								},
+								"required": [
+									"seeds"
+								]
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/AutoplayEnvelope"
+								}
+							}
+						}
+					},
+					"400": {
+						"$ref": "#/components/responses/BadRequest"
+					},
+					"401": {
+						"$ref": "#/components/responses/NotAuthenticated"
+					},
+					"404": {
+						"$ref": "#/components/responses/NotFound"
+					},
+					"500": {
+						"$ref": "#/components/responses/InternalError"
+					},
+					"502": {
+						"$ref": "#/components/responses/DeezerUpstreamError"
+					},
+					"503": {
+						"$ref": "#/components/responses/NoDeezer"
+					}
+				},
+				"x-error-codes": [
+					"INVALID_BODY",
+					"NOT_FOUND",
+					"UPSTREAM_ERROR",
+					"NO_DEEZER"
+				]
+			}
+		},
+		"/api/v1/mixes/daily": {
+			"get": {
+				"tags": [
+					"Listens"
+				],
+				"operationId": "getDailyMix",
+				"summary": "The user's Daily Mix of the day (home)",
+				"description": "Three of the user's top artists (listens + follows), a different three each day: about a third loved tracks by them (liked, recently played), the rest discoveries from their Deezer radios and ListenBrainz / Last.fm tracks similar to two loved ones, early skips left out, at most 3 per artist. With no history: the user's own Deezer Flow (never the service account's). Built on the first call of the day and cached until the day changes or `refresh=1`; yesterday's mix is served when today's can't be built. `tracks` is empty when there is nothing to build it from. Play its tracks with `source: \"daily-mix\"`.",
+				"security": [
+					{
+						"bearerAuth": []
+					},
+					{
+						"sessionCookie": []
+					}
+				],
+				"parameters": [
+					{
+						"name": "day",
+						"in": "query",
+						"required": false,
+						"description": "The client's date (YYYY-MM-DD); the server's UTC date when missing",
+						"schema": {
+							"type": "string",
+							"format": "date"
+						}
+					},
+					{
+						"name": "refresh",
+						"in": "query",
+						"required": false,
+						"description": "Build a new mix",
+						"schema": {
+							"type": "string",
+							"enum": [
+								"1"
+							]
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/DailyMixEnvelope"
+								}
+							}
+						}
+					},
+					"400": {
+						"$ref": "#/components/responses/BadRequest"
+					},
+					"401": {
+						"$ref": "#/components/responses/NotAuthenticated"
+					},
+					"500": {
+						"$ref": "#/components/responses/InternalError"
+					},
+					"503": {
+						"$ref": "#/components/responses/NoDeezer"
+					}
+				},
+				"x-error-codes": [
+					"INVALID_DAY",
+					"NO_DEEZER"
+				]
+			}
+		},
+		"/api/v1/listens": {
+			"post": {
+				"tags": [
+					"Listens"
+				],
+				"operationId": "logListens",
+				"summary": "Append finished plays to the listening log (recommendation signals)",
+				"description": "One event per play, sent when it ends (a repeat or a closed app may report a play in parts). Events whose startedAt is more than 5 min ahead, more than 30 days old, or after their endedAt are dropped and counted in `dropped`.",
+				"security": [
+					{
+						"bearerAuth": []
+					},
+					{
+						"sessionCookie": []
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"properties": {
+									"events": {
+										"type": "array",
+										"items": {
+											"$ref": "#/components/schemas/ListenInput"
+										},
+										"minItems": 1,
+										"maxItems": 50
+									}
+								},
+								"required": [
+									"events"
+								]
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ListensEnvelope"
+								}
+							}
+						}
+					},
+					"400": {
+						"$ref": "#/components/responses/BadRequest"
+					},
+					"401": {
+						"$ref": "#/components/responses/NotAuthenticated"
+					},
+					"500": {
+						"$ref": "#/components/responses/InternalError"
+					}
+				},
+				"x-error-codes": [
+					"INVALID_BODY"
+				]
+			}
+		},
 		"/api/v1/lyrics/{trackId}": {
 			"parameters": [
 				{
@@ -5198,6 +5442,162 @@
 					"playedAt"
 				]
 			},
+			"AutoplayTrack": {
+				"type": "object",
+				"properties": {
+					"trackId": {
+						"type": "string",
+						"description": "Deezer track id"
+					},
+					"title": {
+						"type": "string"
+					},
+					"artist": {
+						"type": "string"
+					},
+					"artistId": {
+						"type": "string",
+						"nullable": true
+					},
+					"album": {
+						"type": "string",
+						"nullable": true
+					},
+					"albumId": {
+						"type": "string",
+						"nullable": true
+					},
+					"cover": {
+						"type": "string",
+						"nullable": true
+					},
+					"duration": {
+						"type": "integer",
+						"nullable": true,
+						"description": "Seconds"
+					}
+				},
+				"required": [
+					"trackId",
+					"title",
+					"artist",
+					"artistId",
+					"album",
+					"albumId",
+					"cover",
+					"duration"
+				]
+			},
+			"DailyMix": {
+				"type": "object",
+				"properties": {
+					"day": {
+						"type": "string",
+						"format": "date",
+						"description": "The user's day (YYYY-MM-DD)"
+					},
+					"basedOn": {
+						"type": "string",
+						"enum": [
+							"taste",
+							"flow"
+						],
+						"description": "taste: the user's top artists of the day; flow: Deezer's Flow (no history yet)"
+					},
+					"artists": {
+						"type": "array",
+						"items": {
+							"type": "string"
+						},
+						"description": "The seed artists' names"
+					},
+					"tracks": {
+						"type": "array",
+						"items": {
+							"$ref": "#/components/schemas/AutoplayTrack"
+						}
+					}
+				},
+				"required": [
+					"day",
+					"basedOn",
+					"artists",
+					"tracks"
+				]
+			},
+			"ListenInput": {
+				"type": "object",
+				"properties": {
+					"trackId": {
+						"type": "string",
+						"description": "Deezer track id"
+					},
+					"artistId": {
+						"type": "string",
+						"nullable": true
+					},
+					"albumId": {
+						"type": "string",
+						"nullable": true
+					},
+					"startedAt": {
+						"type": "string",
+						"format": "date-time",
+						"description": "When the sound started (or this part of the play)"
+					},
+					"endedAt": {
+						"type": "string",
+						"format": "date-time",
+						"nullable": true,
+						"description": "Server clock when omitted; capped to now"
+					},
+					"msPlayed": {
+						"type": "integer",
+						"minimum": 0,
+						"maximum": 86400000,
+						"description": "Time actually listened to (seeks and pauses excluded)"
+					},
+					"durationMs": {
+						"type": "integer",
+						"nullable": true,
+						"minimum": 1
+					},
+					"endReason": {
+						"type": "string",
+						"enum": [
+							"completed",
+							"skipped",
+							"stopped",
+							"failed",
+							"transferred",
+							"closed"
+						],
+						"description": "completed: ran to its end; skipped: the user moved to another track; stopped: playback cleared; failed: could not be played on; transferred: the sound moved to another Device; closed: the page or app went away mid-track."
+					},
+					"client": {
+						"type": "string",
+						"maxLength": 16,
+						"description": "web, android, ios…"
+					},
+					"shuffle": {
+						"type": "boolean",
+						"default": false
+					},
+					"source": {
+						"type": "string",
+						"nullable": true,
+						"maxLength": 128,
+						"description": "Where the play was started from (radio, playlist…)"
+					}
+				},
+				"required": [
+					"trackId",
+					"startedAt",
+					"msPlayed",
+					"endReason",
+					"client"
+				]
+			},
 			"RecentPlayInput": {
 				"type": "object",
 				"properties": {
@@ -6546,6 +6946,90 @@
 					},
 					"data": {
 						"$ref": "#/components/schemas/SkipResult"
+					}
+				},
+				"required": [
+					"success",
+					"data"
+				]
+			},
+			"AutoplayEnvelope": {
+				"type": "object",
+				"properties": {
+					"success": {
+						"type": "boolean",
+						"enum": [
+							true
+						]
+					},
+					"data": {
+						"type": "object",
+						"properties": {
+							"tracks": {
+								"type": "array",
+								"items": {
+									"$ref": "#/components/schemas/AutoplayTrack"
+								}
+							},
+							"seedArtistIds": {
+								"type": "array",
+								"items": {
+									"type": "string"
+								}
+							}
+						},
+						"required": [
+							"tracks",
+							"seedArtistIds"
+						]
+					}
+				},
+				"required": [
+					"success",
+					"data"
+				]
+			},
+			"DailyMixEnvelope": {
+				"type": "object",
+				"properties": {
+					"success": {
+						"type": "boolean",
+						"enum": [
+							true
+						]
+					},
+					"data": {
+						"$ref": "#/components/schemas/DailyMix"
+					}
+				},
+				"required": [
+					"success",
+					"data"
+				]
+			},
+			"ListensEnvelope": {
+				"type": "object",
+				"properties": {
+					"success": {
+						"type": "boolean",
+						"enum": [
+							true
+						]
+					},
+					"data": {
+						"type": "object",
+						"properties": {
+							"stored": {
+								"type": "integer"
+							},
+							"dropped": {
+								"type": "integer"
+							}
+						},
+						"required": [
+							"stored",
+							"dropped"
+						]
 					}
 				},
 				"required": [

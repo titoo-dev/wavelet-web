@@ -412,6 +412,8 @@ function ExtraControls() {
 	const toggleNormalization = usePlayerStore((s) => s.toggleNormalization);
 	const gapless = usePlayerStore((s) => s.gapless);
 	const toggleGapless = usePlayerStore((s) => s.toggleGapless);
+	const autoplay = usePlayerStore((s) => s.autoplay);
+	const toggleAutoplay = usePlayerStore((s) => s.toggleAutoplay);
 
 	return (
 		<DropdownMenu>
@@ -443,6 +445,9 @@ function ExtraControls() {
 					Loudness normalization
 				</DropdownMenuCheckboxItem>
 				<GaplessMenuItem on={gapless} crossfade={crossfadeDuration > 0} onToggle={toggleGapless} />
+				<DropdownMenuCheckboxItem checked={autoplay} onClick={toggleAutoplay} className="rounded-xl py-2">
+					Autoplay similar tracks
+				</DropdownMenuCheckboxItem>
 			</DropdownMenuContent>
 		</DropdownMenu>
 	);

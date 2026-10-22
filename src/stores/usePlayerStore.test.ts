@@ -971,3 +971,40 @@ describe("usePlayerStore — on a Remote (multi-device)", () => {
 		expect(usePlayerStore.getState().currentTrack).toBeNull();
 	});
 });
+
+describe("usePlayerStore — autoplay", () => {
+	afterEach(() => setRemoteSender(null));
+
+	it("is on by default and toggles", () => {
+		expect(usePlayerStore.getState().autoplay).toBe(true);
+		usePlayerStore.getState().toggleAutoplay();
+		expect(usePlayerStore.getState().autoplay).toBe(false);
+	});
+
+	it("appends the tracks after the last one, marked as autoplay, without the queued ones", () => {
+		usePlayerStore.getState().playQueue(makeQueue(["a", "b"]), 1);
+		const added = usePlayerStore.getState().appendAutoplay(makeQueue(["a", "c", "d", "c"]), "b");
+		expect(added).toBe(2);
+		const s = usePlayerStore.getState();
+		expect(s.queue.map((t) => t.trackId)).toEqual(["a", "b", "c", "d"]);
+		expect(s.queue.slice(2).every((t) => t.source === "autoplay")).toBe(true);
+		expect(s.queueIndex).toBe(1);
+		expect(s.currentTrack?.trackId).toBe("b");
+	});
+
+	it("adds nothing once the queue moved on during the request (was: tracks appended after the user's own)", () => {
+		usePlayerStore.getState().playQueue(makeQueue(["a", "b"]), 1);
+		usePlayerStore.getState().addToQueue(makeTrack("z"));
+		expect(usePlayerStore.getState().appendAutoplay(makeQueue(["c"]), "b")).toBe(0);
+		expect(usePlayerStore.getState().queue.map((t) => t.trackId)).toEqual(["a", "b", "z"]);
+	});
+
+	it("adds nothing on repeat, nor on a Remote", () => {
+		usePlayerStore.getState().playQueue(makeQueue(["a"]), 0);
+		usePlayerStore.getState().toggleRepeat();
+		expect(usePlayerStore.getState().appendAutoplay(makeQueue(["c"]), "a")).toBe(0);
+		usePlayerStore.setState({ repeat: "off" });
+		setRemoteSender(() => {});
+		expect(usePlayerStore.getState().appendAutoplay(makeQueue(["c"]), "a")).toBe(0);
+	});
+});

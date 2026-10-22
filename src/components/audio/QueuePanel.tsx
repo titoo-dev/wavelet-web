@@ -7,7 +7,7 @@ import { ArtistLink } from "@/components/links/EntityLink";
 import { leavePlayer } from "./leave-player";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { usePlayerStore, type PlayerTrack } from "@/stores/usePlayerStore";
-import { GripVertical, ListMusic, Shuffle, X, Trash2 } from "lucide-react";
+import { GripVertical, ListMusic, Shuffle, Sparkles, X, Trash2 } from "lucide-react";
 import { Equalizer } from "@/components/motion/icons";
 import { CountPill, CoverTheme, Medallion, entrance } from "@/components/expressive";
 import { PlaybackIndicator } from "./PlaybackIndicator";
@@ -367,8 +367,11 @@ function QueueRow({ track, index, active, isPlaying, showHandle, onJump, onRemov
 
 			<div className="min-w-0 flex-1">
 				<p className={cn("truncate text-[15px] font-semibold leading-tight", active && "font-semibold text-primary")}>{track.title}</p>
-				<p className="mt-0.5 truncate text-[13px] leading-tight text-muted-foreground">
-					<ArtistLink id={track.artistId} name={track.artist} onClick={leavePlayer} className="transition-colors hover:text-foreground" />
+				<p className="mt-0.5 flex items-center gap-1 truncate text-[13px] leading-tight text-muted-foreground">
+					{track.source === "autoplay" && (
+						<Sparkles className="size-3 shrink-0 text-primary" aria-label="Added by autoplay" role="img" />
+					)}
+					<ArtistLink id={track.artistId} name={track.artist} onClick={leavePlayer} className="truncate transition-colors hover:text-foreground" />
 				</p>
 			</div>
 

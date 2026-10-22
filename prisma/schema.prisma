@@ -29,6 +29,8 @@ model User {
   followedArtists  FollowedArtist[]
   sharedTracks     SharedTrack[]
   recentPlays      RecentPlay[]
+  listenEvents     ListenEvent[]
+  dailyMix         DailyMix?
 
   @@map("user")
 }
@@ -354,6 +356,52 @@ model RecentPlay {
   @@unique([userId, trackId])
   @@index([userId, playedAt(sort: Desc)])
   @@map("recent_play")
+}
+
+// ─── Listening log (recommendation signals) ───
+//
+// One row per play of a track, written when the play ends: append-only and
+// never capped (RecentPlay is the capped, de-duplicated history the UI shows).
+// endReason: completed (the track ran to its end), skipped (the user moved to
+// another track), stopped, failed, transferred (the sound moved to another
+// Device), closed (the page or app went away mid-track).
+model ListenEvent {
+  id         String   @id @default(cuid())
+  userId     String
+  trackId    String
+  artistId   String?
+  albumId    String?
+  startedAt  DateTime
+  endedAt    DateTime
+  msPlayed   Int
+  durationMs Int?
+  endReason  String
+  client     String
+  shuffle    Boolean  @default(false)
+  source     String?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startedAt(sort: Desc)])
+  @@index([trackId])
+  @@map("listen_event")
+}
+
+// ─── Daily Mix cache ───
+//
+// The user's Daily Mix of the day (lib/daily-mix.ts), built on the first
+// visit of the day and kept until the next one: one row per user, replaced.
+model DailyMix {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  day       String
+  payload   Json
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("daily_mix")
 }
 
 // ─── External → Deezer track match cache ───

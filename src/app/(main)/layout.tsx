@@ -5,6 +5,7 @@ import { MotionConfig } from "motion/react";
 import { useInitApp } from "@/hooks/useInitApp";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useOverlayHistory } from "@/hooks/useOverlayHistory";
+import { useAutoplay } from "@/hooks/useAutoplay";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { BehindOverlays } from "@/components/layout/BehindOverlays";
 import { NavProgress } from "@/components/layout/NavProgress";
@@ -28,6 +29,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 	useInitApp();
 	useKeyboardShortcuts();
 	useOverlayHistory();
+	useAutoplay();
 
 	return (
 		<MotionConfig reducedMotion="user">
