@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # Lyrics Stories render in a Vercel Function, as a Story Render tracked in Postgres
@@ -17,4 +17,15 @@ A Lyrics Story is an MP4 (1080×1920, 30 fps, H.264 + AAC) made on the server: f
 
 - The function bundle carries an ffmpeg binary and a native canvas library. It must stay under Vercel's 250 MB limit, and the whole route is pinned to the Node.js runtime.
 - `after()` is not durable. A render cut off by a crash or a timeout leaves its row in "rendering", so GC marks rows stuck for longer than `maxDuration` as failed. If renders ever outgrow the budget, this ADR is revisited (720p, then a worker) instead of being stretched.
-- A spike gates the feature: one 30 s render on a Preview deployment must finish in under 120 s and fit in memory before anything else is built.
+- A spike gated the feature: one 30 s render on a Preview deployment had to finish in under 120 s and fit in memory. It passed on 2026-10-24 (branch `spike/story-render`, iad1, 2 vCPU):
+
+  | Run | Total time | Peak RSS | MP4 size |
+  |---|---|---|---|
+  | 1080×1920, x264 `veryfast`, cold | 41.9 s | 164 MB | 1.8 MB |
+  | 1080×1920, x264 `veryfast`, warm | 40.6 s | 170 MB | 1.8 MB |
+  | 720×1280, x264 `veryfast` | 20.9 s | 177 MB | 1.4 MB |
+  | 1080×1920, x264 `ultrafast` | 34.9 s | 195 MB | 5.8 MB |
+
+  - Frames come from @napi-rs/canvas, piped raw RGBA to ffmpeg-static, with real MP3 audio read over HTTP.
+  - Drawing takes about 55 % of the time (≈ 25 ms per 1080p frame). Caching the static layers is the first lever, ahead of 720p.
+  - The function with ffmpeg and canvas deployed within Vercel's size limit, and the rest of the app's bundle did not grow (20.4 MB).
