@@ -57,6 +57,10 @@
 			"description": "Public track share links"
 		},
 		{
+			"name": "Stories",
+			"description": "Lyrics Stories: story videos of a Lyrics Range, and their Theme Stills"
+		},
+		{
 			"name": "Streaming",
 			"description": "Audio playback endpoints"
 		},
@@ -3061,6 +3065,66 @@
 				]
 			}
 		},
+		"/api/v1/stories/stills": {
+			"post": {
+				"tags": [
+					"Stories"
+				],
+				"operationId": "renderThemeStill",
+				"summary": "Theme Still of a Lyrics Range (JPEG)",
+				"description": "One 720×1280 frame of the Lyrics Story the range would make in `theme`, drawn by the same code as the video: halfway through the first line. The excerpt runs from 0.3 s before the first line to `nextLineMs` (or 4 s after the last line when `nextLineMs` is null), capped at the track's end, and must last 5 to 30 s (else 400 INVALID_RANGE). Limited to 60 per minute per user (per server instance): over it → 429 `RATE_LIMITED` + `Retry-After`. Response `Cache-Control: private, max-age=3600`.",
+				"security": [
+					{
+						"bearerAuth": []
+					},
+					{
+						"sessionCookie": []
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/ThemeStillInput"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "The Theme Still",
+						"content": {
+							"image/jpeg": {
+								"schema": {
+									"type": "string",
+									"format": "binary"
+								}
+							}
+						}
+					},
+					"400": {
+						"$ref": "#/components/responses/BadRequest"
+					},
+					"401": {
+						"$ref": "#/components/responses/NotAuthenticated"
+					},
+					"429": {
+						"$ref": "#/components/responses/RateLimited"
+					},
+					"500": {
+						"$ref": "#/components/responses/InternalError"
+					}
+				},
+				"x-error-codes": [
+					"INVALID_BODY",
+					"INVALID_THEME",
+					"MISSING_METADATA",
+					"INVALID_RANGE",
+					"RATE_LIMITED"
+				]
+			}
+		},
 		"/api/v1/shares": {
 			"get": {
 				"tags": [
@@ -5721,6 +5785,77 @@
 					"trackId",
 					"title",
 					"artist"
+				]
+			},
+			"StoryLine": {
+				"type": "object",
+				"properties": {
+					"timeMs": {
+						"type": "integer",
+						"minimum": 0,
+						"description": "When the line starts in the track, ms"
+					},
+					"text": {
+						"type": "string",
+						"maxLength": 200,
+						"description": "As shown in the app; control and bidi-override characters are stripped. May be empty (an instrumental gap)"
+					}
+				},
+				"required": [
+					"timeMs",
+					"text"
+				]
+			},
+			"ThemeStillInput": {
+				"type": "object",
+				"properties": {
+					"theme": {
+						"type": "string",
+						"enum": [
+							"blurred-cover",
+							"palette",
+							"minimal",
+							"vinyl"
+						],
+						"description": "Story Theme"
+					},
+					"title": {
+						"type": "string"
+					},
+					"artist": {
+						"type": "string"
+					},
+					"coverUrl": {
+						"type": "string",
+						"nullable": true,
+						"description": "https Deezer artwork (*.dzcdn.net, api.deezer.com); any other URL is ignored and the theme is drawn without a cover"
+					},
+					"lines": {
+						"type": "array",
+						"items": {
+							"$ref": "#/components/schemas/StoryLine"
+						},
+						"minItems": 1,
+						"maxItems": 30,
+						"description": "The Lyrics Range: consecutive synced lines, times non-decreasing, at least one with text"
+					},
+					"nextLineMs": {
+						"type": "integer",
+						"nullable": true,
+						"description": "Start of the line after the last one, ms; null when the last one ends the song"
+					},
+					"trackDurationMs": {
+						"type": "integer",
+						"minimum": 1,
+						"description": "Track length, ms"
+					}
+				},
+				"required": [
+					"theme",
+					"title",
+					"artist",
+					"lines",
+					"trackDurationMs"
 				]
 			},
 			"SharedTrack": {

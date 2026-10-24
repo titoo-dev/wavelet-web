@@ -1,6 +1,6 @@
 # Lyrics Stories — spec et plan d'implémentation
 
-Statut : **spécifié, spike validé** (2026-10-24). Un rendu de 30 s en 1080p prend environ 41 s sur Vercel (2 vCPU) avec 170 Mo de RAM ; le détail est dans l'ADR 0004. L'étape 1 est la prochaine. Le vocabulaire est défini dans `CONTEXT.md` (§ Lyrics Stories). Les décisions et leurs raisons sont dans docs/adr/0004 (rendu dans une fonction Vercel), 0005 (le client envoie les lignes) et 0006 (garde-fous).
+Statut : **spécifié, spike validé** (2026-10-24). Un rendu de 30 s en 1080p prend environ 41 s sur Vercel (2 vCPU) avec 170 Mo de RAM ; le détail est dans l'ADR 0004. L'étape 1 est faite : Theme Stills en JPEG 720×1280, rendus en 20 à 50 ms. L'étape 2 (Story Render) est la prochaine. Le vocabulaire est défini dans `CONTEXT.md` (§ Lyrics Stories). Les décisions et leurs raisons sont dans docs/adr/0004 (rendu dans une fonction Vercel), 0005 (le client envoie les lignes) et 0006 (garde-fous).
 
 ## Ce que voit l'utilisateur (mobile, v1)
 
@@ -79,7 +79,7 @@ internal/gc : supprime les MP4 > 24 h et les lignes > 7 j, et passe en échec le
 **Dépendances** :
 - `ffmpeg-static` (binaire Linux x64) ;
 - `@napi-rs/canvas` (canvas natif, binaires précompilés, sans dépendances système) ;
-- `sharp` passe en dépendance de production (décodage de la pochette pour la palette et le flou).
+- Pas de `sharp` : `@napi-rs/canvas` décode la pochette, la floute (`ctx.filter`) et en tire la palette.
 - Il faut vérifier que `next.config` embarque bien le binaire ffmpeg dans la fonction (`outputFileTracingIncludes`) et que le bundle reste sous 250 Mo.
 
 **Audio d'un titre pas en cache** :
@@ -109,7 +109,7 @@ Chaque étape est une PR avec ses tests (règle « fix-bug-once » de CLAUDE.md)
 | # | Étape | Contenu | Fini quand |
 |---|---|---|---|
 | 0 ✅ | **Spike de faisabilité** (bloquant) — fait le 2026-10-24 : 41 s en 1080p, 21 s en 720p, branche `spike/story-render` (jetable) | Route jetable sur une Preview Vercel : 30 s, un thème, `@napi-rs/canvas` → `ffmpeg-static`, audio d'une copie R2 de dev. On mesure le temps, la mémoire, la taille du bundle et les cold starts. | Rendu < 120 s et bundle < 250 Mo. Sinon on passe en 720p, ou on revoit l'ADR 0004. |
-| 1 | **Cœur pur + Theme Stills** | `range.ts`, `timeline.ts`, `layout.ts`, les 4 thèmes, `fonts.ts`, la route `stills`, l'OpenAPI. | Tests unitaires des bornes et de la timeline, PNG de chaque thème vérifié à l'œil (script `scripts/story-stills.ts`). |
+| 1 ✅ | **Cœur pur + Theme Stills** | `range.ts`, `timeline.ts`, `layout.ts`, les 4 thèmes, `fonts.ts`, la route `stills`, l'OpenAPI. | Tests unitaires des bornes et de la timeline, PNG de chaque thème vérifié à l'œil (script `scripts/story-stills.ts`). |
 | 2 | **Story Render serveur** | Modèle + migration, `audio-source.ts`, `render.ts`, POST et GET, réutilisation, limites, GC, `maxDuration`. | Tests des routes (création, réutilisation, quota, 1 en cours, accès d'un autre utilisateur → 404, échec → `failed` et réessayable). Script `scripts/e2e-story.ts` : rendu réel sur une base jetable et le bucket de dev, puis `ffprobe` (durée, 1080×1920, AAC). |
 | 3 | **Mobile : sélection** | `range_selection.dart`, mode sélection dans la vue paroles (bouton, appui long), entrée dans le menu d'actions, Preview de l'extrait. | Tests unitaires de la sélection, tests de widget de la vue paroles. |
 | 4 | **Mobile : thèmes, rendu, partage** | Carrousel de Theme Stills, suivi + notification locale, téléchargement, écran de résultat, Partager, Enregistrer dans la galerie, permissions Android et iOS. | Tests de widget, puis essai sur l'émulateur Pixel_4a et un vrai téléphone : partage vers Instagram, TikTok et Facebook. |

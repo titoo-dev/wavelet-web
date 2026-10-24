@@ -583,6 +583,25 @@ const schemas = {
 		},
 		["trackId", "title", "artist"]
 	),
+	StoryLine: obj(
+		{
+			timeMs: int({ minimum: 0, description: "When the line starts in the track, ms" }),
+			text: str({ maxLength: 200, description: "As shown in the app; control and bidi-override characters are stripped. May be empty (an instrumental gap)" }),
+		},
+		["timeMs", "text"]
+	),
+	ThemeStillInput: obj(
+		{
+			theme: str({ enum: ["blurred-cover", "palette", "minimal", "vinyl"], description: "Story Theme" }),
+			title: str(),
+			artist: str(),
+			coverUrl: nstr({ description: "https Deezer artwork (*.dzcdn.net, api.deezer.com); any other URL is ignored and the theme is drawn without a cover" }),
+			lines: arr(ref("StoryLine"), { minItems: 1, maxItems: 30, description: "The Lyrics Range: consecutive synced lines, times non-decreasing, at least one with text" }),
+			nextLineMs: nint({ description: "Start of the line after the last one, ms; null when the last one ends the song" }),
+			trackDurationMs: int({ minimum: 1, description: "Track length, ms" }),
+		},
+		["theme", "title", "artist", "lines", "trackDurationMs"]
+	),
 	SharedTrack: obj(
 		{
 			id: str(),
@@ -1429,6 +1448,25 @@ const paths = {
 		},
 	},
 
+	// ─── Lyrics Stories ───
+	"/api/v1/stories/stills": {
+		post: {
+			tags: ["Stories"],
+			operationId: "renderThemeStill",
+			summary: "Theme Still of a Lyrics Range (JPEG)",
+			description: "One 720×1280 frame of the Lyrics Story the range would make in `theme`, drawn by the same code as the video: halfway through the first line. The excerpt runs from 0.3 s before the first line to `nextLineMs` (or 4 s after the last line when `nextLineMs` is null), capped at the track's end, and must last 5 to 30 s (else 400 INVALID_RANGE). Limited to 60 per minute per user (per server instance): over it → 429 `RATE_LIMITED` + `Retry-After`. Response `Cache-Control: private, max-age=3600`.",
+			security: userAuth,
+			requestBody: body(ref("ThemeStillInput")),
+			responses: {
+				200: { description: "The Theme Still", content: { "image/jpeg": { schema: { type: "string", format: "binary" } } } },
+				...E_400,
+				429: err("RateLimited"),
+				...E_USER,
+			},
+			"x-error-codes": ["INVALID_BODY", "INVALID_THEME", "MISSING_METADATA", "INVALID_RANGE", "RATE_LIMITED"],
+		},
+	},
+
 	// ─── Shares ───
 	"/api/v1/shares": {
 		get: {
@@ -1729,6 +1767,7 @@ const spec = {
 		{ name: "Listens", description: "Append-only listening log: one event per play, the recommendation signals" },
 		{ name: "Lyrics", description: "Synced (LRC) and plain lyrics" },
 		{ name: "Shares", description: "Public track share links" },
+		{ name: "Stories", description: "Lyrics Stories: story videos of a Lyrics Range, and their Theme Stills" },
 		{ name: "Streaming", description: "Audio playback endpoints" },
 		{ name: "Settings", description: "Engine settings and UI preferences" },
 		{ name: "Internal", description: "Server maintenance (Vercel Cron) — not for app clients" },
