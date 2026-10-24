@@ -3,6 +3,7 @@ import { timingSafeEqual } from "crypto";
 import { ok, fail } from "../../_lib/helpers";
 import { collectStorageGarbage } from "@/lib/wavelet/storage/gc";
 import { createStorageProvider } from "@/lib/wavelet/storage/factory";
+import { collectStoryGarbage } from "@/lib/story/story-render";
 
 export const maxDuration = 60;
 
@@ -25,7 +26,9 @@ export async function GET(request: NextRequest) {
 	try {
 		const storage = createStorageProvider();
 		const report = await collectStorageGarbage({ deleteObject: (key) => storage.deleteFile(key) });
-		return ok({ ran: true, ...report });
+		// Lyrics Stories: MP4s past 24 h, rows past 7 days, renders that died with their function.
+		const stories = await collectStoryGarbage((key) => storage.deleteFile(key));
+		return ok({ ran: true, ...report, stories });
 	} catch (e) {
 		console.error("[internal/gc] failed:", e);
 		return fail("INTERNAL_ERROR", "Garbage collection failed.", 500);

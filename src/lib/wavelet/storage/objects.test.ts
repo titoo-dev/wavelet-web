@@ -36,6 +36,9 @@ describe("inferContentType", () => {
 	it.each([
 		["a.flac", "audio/flac"],
 		["a.mp4", "audio/mp4"],
+		["tracks/1/15.mp4", "audio/mp4"],
+		["stories/u1/r1.mp4", "video/mp4"],
+		["/stories/u1/r1.mp4", "video/mp4"],
 		["a.mp3", "audio/mpeg"],
 		["cover.JPG", "image/jpeg"],
 		["cover.jpeg", "image/jpeg"],
