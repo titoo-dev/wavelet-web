@@ -6,7 +6,7 @@ import { isStoryTheme, STORY_THEMES } from "@/lib/story/themes";
 import { DAILY_RENDER_LIMIT, publicRender, requestRender, runRender } from "@/lib/story/story-render";
 
 export const runtime = "nodejs";
-// The render runs in after() within this budget (docs/adr/0004: ~41 s for 30 s of 1080p on 2 vCPU).
+// The render runs in after() within this budget (docs/adr/0004: ~41 s for 30 s of 1080p on 2 vCPU, so ~85 s for the 60 s maximum).
 export const maxDuration = 300;
 
 const text = (v: unknown) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, MAX_SHARE_TEXT) : "");

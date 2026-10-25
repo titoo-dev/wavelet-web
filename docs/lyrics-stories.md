@@ -1,6 +1,6 @@
 # Lyrics Stories — spec et plan d'implémentation
 
-Statut : **spécifié, spike validé** (2026-10-24). Un rendu de 30 s en 1080p prend environ 41 s sur Vercel (2 vCPU) avec 170 Mo de RAM ; le détail est dans l'ADR 0004. L'étape 1 est faite : Theme Stills en JPEG 720×1280, rendus en 20 à 50 ms. L'étape 2 est faite : Story Render, avec un rendu réel de 25 s en 1080p en 14 s en local (`scripts/e2e-story.ts`). Les étapes 3 et 4 (mobile) sont les prochaines. Le vocabulaire est défini dans `CONTEXT.md` (§ Lyrics Stories). Les décisions et leurs raisons sont dans docs/adr/0004 (rendu dans une fonction Vercel), 0005 (le client envoie les lignes) et 0006 (garde-fous).
+Statut : **spécifié, spike validé** (2026-10-24). Un rendu de 30 s en 1080p prend environ 41 s sur Vercel (2 vCPU) avec 170 Mo de RAM ; le détail est dans l'ADR 0004. L'étape 1 est faite : Theme Stills en JPEG 720×1280, rendus en 20 à 50 ms. L'étape 2 est faite : Story Render, avec un rendu réel de 25 s en 1080p en 14 s en local (`scripts/e2e-story.ts`). Les étapes 3 et 4 (mobile) sont faites, livrées en v1.8.0. La limite est passée de 30 à 60 s le 2026-10-25 (web, puis mobile v1.8.1). Le vocabulaire est défini dans `CONTEXT.md` (§ Lyrics Stories). Les décisions et leurs raisons sont dans docs/adr/0004 (rendu dans une fonction Vercel), 0005 (le client envoie les lignes) et 0006 (garde-fous).
 
 ## Ce que voit l'utilisateur (mobile, v1)
 
@@ -11,7 +11,7 @@ Statut : **spécifié, spike validé** (2026-10-24). Un rendu de 30 s en 1080p p
    - Un titre sans paroles synchronisées (`hasUsableSync` faux) n'a pas de partage en story : le bouton est masqué dans le menu et grisé dans la vue paroles.
 2. **Lyrics Range** :
    - on touche une première ligne puis une dernière ;
-   - la durée s'affiche, et une ligne qui ferait dépasser 30 s ne peut pas être ajoutée ;
+   - la durée s'affiche, et une ligne qui ferait dépasser 60 s ne peut pas être ajoutée ;
    - il faut au moins 5 s.
    - Un bouton lance la **Preview** de l'extrait sur ce téléphone. Elle reste hors de la Playback Session et, sur un Remote, met en pause l'Active Device.
 3. **Story Theme** : un carrousel de 4 **Theme Stills** (Pochette floutée, Palette, Minimal, Vinyle), rendus par le serveur. Le dernier thème choisi est retenu.
@@ -27,7 +27,7 @@ Statut : **spécifié, spike validé** (2026-10-24). Un rendu de 30 s en 1080p p
 
 | Sujet | Règle |
 |---|---|
-| Extrait | 5 à 30 s, par lignes entières. Début = 1re ligne − 0,3 s (jamais < 0). Fin = début de la ligne qui suit la dernière, ou + 4 s si c'est la dernière de la chanson, plafonnée à la durée du titre. Fondus d'entrée et de sortie de 0,3 s. Les 30 s portent sur [début, fin]. |
+| Extrait | 5 à 60 s, par lignes entières (30 s au départ, porté à 60 s le 2026-10-25). Début = 1re ligne − 0,3 s (jamais < 0). Fin = début de la ligne qui suit la dernière, ou + 4 s si c'est la dernière de la chanson, plafonnée à la durée du titre. Fondus d'entrée et de sortie de 0,3 s. Les 60 s portent sur [début, fin]. |
 | Vidéo | MP4 1080×1920, 30 fps, H.264 (yuv420p, `+faststart`), AAC 192 kbps. |
 | Animation | Ligne par ligne sur les horodatages LRC : ligne courante mise en avant, les autres estompées, défilement. Pas de mot à mot (les parsers suppriment les balises au mot). |
 | Contenu | Paroles, titre, artiste, petit filigrane « Wavelet ». Ni lien ni QR code. |
@@ -56,7 +56,7 @@ Le Theme Still est la frame du milieu de la première ligne : même `draw`, rend
 
 ```
 src/lib/story/
-  range.ts          # validation d'une Lyrics Range + bornes de l'extrait (marge, fin, plafond 30 s)  — pur
+  range.ts          # validation d'une Lyrics Range + bornes de l'extrait (marge, fin, plafond 60 s)  — pur
   timeline.ts       # t → ligne courante, progression, opacités, défilement                         — pur
   layout.ts         # découpe des lignes en lignes visuelles, taille de police, sans débordement   — pur (mesure injectée)
   themes/{blurred-cover,palette,minimal,vinyl}.ts + index.ts
@@ -91,7 +91,7 @@ internal/gc : supprime les MP4 > 24 h et les lignes > 7 j, et passe en échec le
 ```
 lib/features/story/
   story_api.dart            # createStory, getStory, getThemeStill (ajout aussi dans wavelet_api.dart)
-  range_selection.dart      # état de sélection (pur) : ajout / retrait de lignes, durée, plafond 30 s, bornes de l'extrait
+  range_selection.dart      # état de sélection (pur) : ajout / retrait de lignes, durée, plafond 60 s, bornes de l'extrait
   story_flow_screen.dart    # sélection (réutilise la vue paroles) → thèmes → rendu → résultat
   theme_carousel.dart       # Theme Stills
   render_progress.dart      # suivi du statut (toutes les 2 s, recul progressif), notification locale

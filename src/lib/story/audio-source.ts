@@ -121,7 +121,7 @@ export const defaultAudioSourceDeps: AudioSourceDeps = {
 	async findCopy(userId, trackId) {
 		const { findCachedCopy, resolveCacheQuery } = await import("@/lib/wavelet/storage/cached-copy");
 		const decision = await findCachedCopy(trackId, await resolveCacheQuery(userId));
-		// An under-quality copy is still a fine source for a 30 s excerpt.
+		// An under-quality copy is still a fine source for a 60 s excerpt.
 		const row = decision.kind === "hit" ? decision.row : decision.kind === "upgrade" ? decision.best : null;
 		// findCachedCopy loads whole StoredTrack rows; its type only names the fields it reads.
 		return row ? { storagePath: row.storagePath, fileSize: (row as { fileSize?: number | null }).fileSize ?? null } : null;

@@ -3,14 +3,14 @@
 // checks it and works out the audio excerpt (docs/lyrics-stories.md § Règles).
 
 export const MIN_RANGE_MS = 5_000;
-export const MAX_RANGE_MS = 30_000;
+export const MAX_RANGE_MS = 60_000;
 /** The excerpt starts this long before the first line. */
 export const LEAD_MS = 300;
 /** After the last line of the song, the excerpt runs this long. */
 export const TAIL_MS = 4_000;
 /** Fade in and fade out of the audio. */
 export const FADE_MS = 300;
-export const MAX_LINES = 30;
+export const MAX_LINES = 60;
 export const MAX_LINE_CHARS = 200;
 const MAX_TRACK_MS = 24 * 60 * 60 * 1000;
 

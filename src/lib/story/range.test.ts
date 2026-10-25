@@ -48,7 +48,7 @@ describe("parseLyricsRange", () => {
 		["nextLineMs before the last line", { ...base, nextLineMs: 18_000 }],
 		["a non-numeric nextLineMs", { ...base, nextLineMs: "22000" }],
 		["an excerpt under 5 s", { ...base, lines: lines([10_000]), nextLineMs: 14_000 }],
-		["an excerpt over 30 s", { ...base, nextLineMs: 40_000 }],
+		["an excerpt over 60 s", { ...base, nextLineMs: 75_000 }],
 	])("refuses %s", (_name, input) => {
 		expect(parseLyricsRange(input as never).ok).toBe(false);
 	});
@@ -63,8 +63,15 @@ describe("parseLyricsRange", () => {
 	});
 
 	it("says how long the refused excerpt lasts", () => {
-		const r = parseLyricsRange({ ...base, nextLineMs: 45_000 });
-		expect(!r.ok && r.message).toContain("35.3 s");
+		const r = parseLyricsRange({ ...base, nextLineMs: 80_000 });
+		expect(!r.ok && r.message).toContain("70.3 s");
+	});
+
+	it("accepts a whole chorus up to 60 s (was: capped at 30 s, too short for a chorus)", () => {
+		const chorus = lines(Array.from({ length: 16 }, (_, i) => 10_000 + i * 3_500));
+		const r = parseLyricsRange({ lines: chorus, nextLineMs: 69_000, trackDurationMs: 200_000 });
+		expect(r.ok && r.range.durationMs).toBe(59_300);
+		expect(parseLyricsRange({ lines: chorus, nextLineMs: 70_000, trackDurationMs: 200_000 }).ok).toBe(false);
 	});
 });
 
