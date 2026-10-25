@@ -33,8 +33,7 @@ import {
 import { useTypedSearch } from "../_lib/useSearch";
 import { KindPill } from "./bits";
 import { VirtualRows } from "@/components/virtual/VirtualRows";
-
-/* eslint-disable @typescript-eslint/no-explicit-any -- raw Deezer GW/API payloads */
+import type { GwResults } from "@/lib/deezer/gw";
 
 const ARTIST_ITEM = "w-[128px] sm:w-[150px] lg:w-[164px]";
 
@@ -81,14 +80,14 @@ export function AllResults({
 	albumMap,
 }: {
 	term: string;
-	main: any;
+	main: GwResults;
 	loading: boolean;
 	error: string | null;
 	onRetry: () => void;
 	onTab: (t: SearchTab) => void;
 	albumMap: Map<string, string>;
 }) {
-	const allTracks = useMemo<TrackRowTrack[]>(() => (main?.TRACK?.data ?? []).map((t: any) => trackFromDeezerRaw(t)), [main]);
+	const allTracks = useMemo<TrackRowTrack[]>(() => (main?.TRACK?.data ?? []).map((t: GwResults) => trackFromDeezerRaw(t)), [main]);
 
 	return (
 		<AnimatePresence mode="wait" initial={false}>
@@ -113,7 +112,7 @@ export function AllResults({
 	);
 }
 
-function AllData({ term, main, tracks, onTab, albumMap }: { term: string; main: any; tracks: TrackRowTrack[]; onTab: (t: SearchTab) => void; albumMap: Map<string, string> }) {
+function AllData({ term, main, tracks, onTab, albumMap }: { term: string; main: GwResults; tracks: TrackRowTrack[]; onTab: (t: SearchTab) => void; albumMap: Map<string, string> }) {
 	const pick = pickTopResult(main, term);
 	const artists = (main?.ARTIST?.data ?? []).slice(0, 12).map(artistProps);
 	const albums = (main?.ALBUM?.data ?? []).slice(0, 12).map(albumProps);
@@ -422,7 +421,7 @@ function LoadMore({ hasMore, loading, onMore }: { hasMore: boolean; loading: boo
 	);
 }
 
-function TrackResults({ tracks, total }: { tracks: any[]; total?: number }) {
+function TrackResults({ tracks, total }: { tracks: GwResults[]; total?: number }) {
 	const normalized = useMemo<TrackRowTrack[]>(() => tracks.map((t) => trackFromDeezerRaw(t)), [tracks]);
 	const enqueue = useDownloadStore((s) => s.enqueue);
 	const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
