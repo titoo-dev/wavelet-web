@@ -76,6 +76,8 @@ export default defineConfig({
 				"src/lib/wavelet/tee-pump.ts",
 				"src/lib/auth.ts",
 				"src/lib/cover-palette.ts",
+				"src/lib/story/**/*.ts",
+				"src/app/api/v1/stories/**",
 				"src/lib/discover.ts",
 				"src/lib/lyrics/**",
 				"src/app/api/v1/lyrics/**",

@@ -51,11 +51,35 @@ _Avoid_: Snippet, sample, extract
 **Share Player**:
 The public player behind a share link. Its listener may be signed out, so it is never a **Device** and never touches a **Playback Session**.
 
+### Lyrics Stories
+
+**Lyrics Range**:
+A run of consecutive synced lyric lines of one track, picked by a listener, lasting 5 to 30 seconds. It is chosen by whole lines, never by free timestamps; a track without synced lyrics has no **Lyrics Range**.
+_Avoid_: Selection, snippet, extract, clip
+
+**Lyrics Story**:
+A short vertical video of a **Lyrics Range**: the matching audio excerpt with its lines appearing in time, the title and the artist, in one **Story Theme**. It is made to be posted to Instagram, Facebook or TikTok stories, and it carries no share link.
+_Avoid_: Clip, reel, lyric video, story (bare)
+
+**Story Theme**:
+One visual layout a **Lyrics Story** can be rendered in (Blurred Cover, Palette, Minimal, Vinyl). The listener picks it; the track's cover feeds it.
+_Avoid_: Template, skin, style
+
+**Theme Still**:
+A still image of a **Lyrics Range** in one **Story Theme**, shown while the listener picks a theme. It comes from the same drawing as the **Lyrics Story**, so what they pick is what they get.
+_Avoid_: Preview (that is the audio excerpt), thumbnail, mock-up
+
+**Story Render**:
+One request to turn a **Lyrics Range** and a **Story Theme** into a **Lyrics Story**, from queued to ready or failed. A ready one can be downloaded for 24 hours, then it is gone; asking again for the same track, range and theme within that time returns the same **Story Render**.
+_Avoid_: Export, job (bare), video (for the request)
+
 ## Relationships
 
 - A user has one **Playback Session** and many **Devices**.
 - A **Playback Session** has zero or one **Active Device**; every other **Online Device** is a **Remote**.
 - A **Remote** sends **Commands**; the **Active Device** carries them out and publishes the **Playback Session**.
+- A **Lyrics Range** and a **Story Theme** make one **Story Render**, which produces one **Lyrics Story**. Listening to the **Lyrics Range** before rendering is a **Preview**.
+- A **Lyrics Story** is not a share link: the **Share Player** never shows it, and a **Lyrics Story** never links to one.
 
 ## Example dialogue
 
@@ -70,3 +94,4 @@ The public player behind a share link. Its listener may be signed out, so it is 
 
 - "Multi channel" was used for the Spotify Connect-like feature. "Channel" is dropped; the unit is the **Device**, and web / mobile is its **Platform**.
 - "Session" alone means the sign-in session (better-auth). The listening state is always the **Playback Session**.
+- "Story" alone is ambiguous between the social-network post and our video. Ours is always a **Lyrics Story**; the image shown while picking a theme is a **Theme Still**, never a "preview", which is reserved for the audio **Preview**.

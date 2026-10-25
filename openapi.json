@@ -57,6 +57,10 @@
 			"description": "Public track share links"
 		},
 		{
+			"name": "Stories",
+			"description": "Lyrics Stories: story videos of a Lyrics Range, and their Theme Stills"
+		},
+		{
 			"name": "Streaming",
 			"description": "Audio playback endpoints"
 		},
@@ -3141,6 +3145,190 @@
 				]
 			}
 		},
+		"/api/v1/stories": {
+			"post": {
+				"tags": [
+					"Stories"
+				],
+				"operationId": "createStoryRender",
+				"summary": "Render a Lyrics Story (MP4) of a Lyrics Range",
+				"description": "Same range rules as the Theme Stills. **202** with a new `queued` render: it is drawn after the response (about 15–45 s for 30 s of video); follow it with `GET /api/v1/stories/{renderId}`. **200** with the same request's render (same track, range, lines and theme) when it is queued, rendering or ready less than 24 h ago. **409** `RENDER_IN_PROGRESS` while another of your renders runs (its id in `X-Story-Render-Id`). **429** `DAILY_LIMIT` after 20 renders in 24 h (failed ones not counted). The audio comes from the cached copy, else your Deezer session.",
+				"security": [
+					{
+						"bearerAuth": []
+					},
+					{
+						"sessionCookie": []
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/CreateStoryInput"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "The same request's render, reused",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/StoryRenderEnvelope"
+								}
+							}
+						}
+					},
+					"202": {
+						"description": "Render queued",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/StoryRenderEnvelope"
+								}
+							}
+						}
+					},
+					"400": {
+						"$ref": "#/components/responses/BadRequest"
+					},
+					"401": {
+						"$ref": "#/components/responses/NotAuthenticated"
+					},
+					"409": {
+						"$ref": "#/components/responses/StoryInProgress"
+					},
+					"429": {
+						"$ref": "#/components/responses/StoryLimited"
+					},
+					"500": {
+						"$ref": "#/components/responses/InternalError"
+					}
+				},
+				"x-error-codes": [
+					"INVALID_BODY",
+					"MISSING_TRACK_ID",
+					"INVALID_THEME",
+					"MISSING_METADATA",
+					"INVALID_RANGE",
+					"RENDER_IN_PROGRESS",
+					"DAILY_LIMIT"
+				]
+			}
+		},
+		"/api/v1/stories/{renderId}": {
+			"parameters": [
+				{
+					"name": "renderId",
+					"in": "path",
+					"required": true,
+					"description": "Story Render id",
+					"schema": {
+						"type": "string"
+					}
+				}
+			],
+			"get": {
+				"tags": [
+					"Stories"
+				],
+				"operationId": "getStoryRender",
+				"summary": "Status of one of your Story Renders, and its download link once ready",
+				"description": "Poll every 2 s or so while `queued` / `rendering`. Once `ready`, `url` is a presigned link to the MP4 for 1 h (ask again for a fresh one) until `expiresAt`, 24 h after it was ready; after that the status is `expired`. A render silent for 6 min is `failed` with `TIMED_OUT`. Another user's render is a 404.",
+				"security": [
+					{
+						"bearerAuth": []
+					},
+					{
+						"sessionCookie": []
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/StoryRenderEnvelope"
+								}
+							}
+						}
+					},
+					"401": {
+						"$ref": "#/components/responses/NotAuthenticated"
+					},
+					"404": {
+						"$ref": "#/components/responses/NotFound"
+					},
+					"500": {
+						"$ref": "#/components/responses/InternalError"
+					}
+				}
+			}
+		},
+		"/api/v1/stories/stills": {
+			"post": {
+				"tags": [
+					"Stories"
+				],
+				"operationId": "renderThemeStill",
+				"summary": "Theme Still of a Lyrics Range (JPEG)",
+				"description": "One 720×1280 frame of the Lyrics Story the range would make in `theme`, drawn by the same code as the video: halfway through the first line. The excerpt runs from 0.3 s before the first line to `nextLineMs` (or 4 s after the last line when `nextLineMs` is null), capped at the track's end, and must last 5 to 30 s (else 400 INVALID_RANGE). Limited to 60 per minute per user (per server instance): over it → 429 `RATE_LIMITED` + `Retry-After`. Response `Cache-Control: private, max-age=3600`.",
+				"security": [
+					{
+						"bearerAuth": []
+					},
+					{
+						"sessionCookie": []
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/ThemeStillInput"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"description": "The Theme Still",
+						"content": {
+							"image/jpeg": {
+								"schema": {
+									"type": "string",
+									"format": "binary"
+								}
+							}
+						}
+					},
+					"400": {
+						"$ref": "#/components/responses/BadRequest"
+					},
+					"401": {
+						"$ref": "#/components/responses/NotAuthenticated"
+					},
+					"429": {
+						"$ref": "#/components/responses/RateLimited"
+					},
+					"500": {
+						"$ref": "#/components/responses/InternalError"
+					}
+				},
+				"x-error-codes": [
+					"INVALID_BODY",
+					"INVALID_THEME",
+					"MISSING_METADATA",
+					"INVALID_RANGE",
+					"RATE_LIMITED"
+				]
+			}
+		},
 		"/api/v1/shares": {
 			"get": {
 				"tags": [
@@ -4028,6 +4216,26 @@
 			},
 			"RateLimited": {
 				"description": "Upstream rate limit",
+				"content": {
+					"application/json": {
+						"schema": {
+							"$ref": "#/components/schemas/ErrorResponse"
+						}
+					}
+				}
+			},
+			"StoryLimited": {
+				"description": "`RATE_LIMITED` (Theme Stills, with `Retry-After`) or `DAILY_LIMIT` (Story Renders)",
+				"content": {
+					"application/json": {
+						"schema": {
+							"$ref": "#/components/schemas/ErrorResponse"
+						}
+					}
+				}
+			},
+			"StoryInProgress": {
+				"description": "`RENDER_IN_PROGRESS` — another of your Story Renders runs; its id is in `X-Story-Render-Id`",
 				"content": {
 					"application/json": {
 						"schema": {
@@ -5803,6 +6011,198 @@
 					"artist"
 				]
 			},
+			"StoryLine": {
+				"type": "object",
+				"properties": {
+					"timeMs": {
+						"type": "integer",
+						"minimum": 0,
+						"description": "When the line starts in the track, ms"
+					},
+					"text": {
+						"type": "string",
+						"maxLength": 200,
+						"description": "As shown in the app; control and bidi-override characters are stripped. May be empty (an instrumental gap)"
+					}
+				},
+				"required": [
+					"timeMs",
+					"text"
+				]
+			},
+			"ThemeStillInput": {
+				"type": "object",
+				"properties": {
+					"theme": {
+						"type": "string",
+						"enum": [
+							"blurred-cover",
+							"palette",
+							"minimal",
+							"vinyl"
+						],
+						"description": "Story Theme"
+					},
+					"title": {
+						"type": "string"
+					},
+					"artist": {
+						"type": "string"
+					},
+					"coverUrl": {
+						"type": "string",
+						"nullable": true,
+						"description": "https Deezer artwork (*.dzcdn.net, api.deezer.com); any other URL is ignored and the theme is drawn without a cover"
+					},
+					"lines": {
+						"type": "array",
+						"items": {
+							"$ref": "#/components/schemas/StoryLine"
+						},
+						"minItems": 1,
+						"maxItems": 30,
+						"description": "The Lyrics Range: consecutive synced lines, times non-decreasing, at least one with text"
+					},
+					"nextLineMs": {
+						"type": "integer",
+						"nullable": true,
+						"description": "Start of the line after the last one, ms; null when the last one ends the song"
+					},
+					"trackDurationMs": {
+						"type": "integer",
+						"minimum": 1,
+						"description": "Track length, ms"
+					}
+				},
+				"required": [
+					"theme",
+					"title",
+					"artist",
+					"lines",
+					"trackDurationMs"
+				]
+			},
+			"CreateStoryInput": {
+				"allOf": [
+					{
+						"$ref": "#/components/schemas/ThemeStillInput"
+					},
+					{
+						"type": "object",
+						"properties": {
+							"trackId": {
+								"type": "string",
+								"pattern": "^\\d+$",
+								"description": "Deezer track id"
+							}
+						},
+						"required": [
+							"trackId"
+						]
+					}
+				]
+			},
+			"StoryRender": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"status": {
+						"type": "string",
+						"enum": [
+							"queued",
+							"rendering",
+							"ready",
+							"failed",
+							"expired"
+						],
+						"description": "`expired`: was ready, the MP4 is gone (kept 24 h)"
+					},
+					"progress": {
+						"type": "number",
+						"minimum": 0,
+						"maximum": 1
+					},
+					"trackId": {
+						"type": "string"
+					},
+					"theme": {
+						"type": "string",
+						"enum": [
+							"blurred-cover",
+							"palette",
+							"minimal",
+							"vinyl"
+						]
+					},
+					"startMs": {
+						"type": "integer",
+						"description": "Excerpt start in the track, ms"
+					},
+					"endMs": {
+						"type": "integer",
+						"description": "Excerpt end in the track, ms"
+					},
+					"createdAt": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"readyAt": {
+						"type": "string",
+						"format": "date-time",
+						"nullable": true
+					},
+					"expiresAt": {
+						"type": "string",
+						"format": "date-time",
+						"nullable": true,
+						"description": "When the MP4 stops being downloadable (readyAt + 24 h)"
+					},
+					"size": {
+						"type": "integer",
+						"nullable": true,
+						"description": "MP4 size in bytes, while ready"
+					},
+					"url": {
+						"type": "string",
+						"nullable": true,
+						"description": "Presigned download URL of the MP4 (1080×1920 H.264 + AAC), while ready; GET /api/v1/stories/{renderId} only"
+					},
+					"urlExpiresAt": {
+						"type": "string",
+						"format": "date-time",
+						"description": "When `url` stops working (1 h); GET only, when ready"
+					},
+					"error": {
+						"type": "string",
+						"nullable": true,
+						"enum": [
+							"NO_DEEZER",
+							"AUDIO_UNAVAILABLE",
+							"RENDER_FAILED",
+							"TIMED_OUT",
+							null
+						],
+						"description": "Why it failed; null otherwise"
+					}
+				},
+				"required": [
+					"id",
+					"status",
+					"progress",
+					"trackId",
+					"theme",
+					"startMs",
+					"endMs",
+					"createdAt",
+					"readyAt",
+					"expiresAt",
+					"size",
+					"url",
+					"error"
+				]
+			},
 			"SharedTrack": {
 				"type": "object",
 				"properties": {
@@ -7161,6 +7561,24 @@
 					},
 					"data": {
 						"$ref": "#/components/schemas/Lyrics"
+					}
+				},
+				"required": [
+					"success",
+					"data"
+				]
+			},
+			"StoryRenderEnvelope": {
+				"type": "object",
+				"properties": {
+					"success": {
+						"type": "boolean",
+						"enum": [
+							true
+						]
+					},
+					"data": {
+						"$ref": "#/components/schemas/StoryRender"
 					}
 				},
 				"required": [
