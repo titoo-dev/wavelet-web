@@ -41,7 +41,9 @@ export const PlaylistStatus = {
 /**
  * A gw-light `results` payload. Its shape depends on the method and the page
  * (deezer.pageArtist, song.getListData, …) and nothing validates it: callers
- * read the fields they need as Deezer sends them.
+ * read the fields they need as Deezer sends them. The same raw items reach
+ * the UI (search/main mixes public API items into the gw sections), so the
+ * mappers there take them as this type too.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- schemaless gw-light JSON, see above
 export type GwResults = any;

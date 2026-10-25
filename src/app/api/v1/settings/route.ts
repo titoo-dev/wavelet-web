@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@/generated/prisma/client";
 import { ok, fail, handleError, requireApp, requireUser } from "../_lib/helpers";
 
 // GET /api/v1/settings — Get settings (per-user if authenticated, defaults otherwise)
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
 		const { app, error: appError } = await requireApp();
 		if (appError) return appError;
 
-		let body: { settings?: Record<string, unknown> | null };
+		let body: { settings?: Prisma.InputJsonObject | null };
 		try {
 			body = await request.json();
 		} catch {

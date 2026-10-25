@@ -1,6 +1,9 @@
 import { Picture } from "./Picture";
 import { VARIOUS_ARTISTS } from "./index";
 
+/** Artist names by role ("Main", "Featured", …), as tagged. */
+export type ArtistsByRole = { Main: string[]; [role: string]: string[] };
+
 export class Artist {
 	id: number;
 	name: string;

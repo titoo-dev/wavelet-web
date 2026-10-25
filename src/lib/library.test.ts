@@ -37,12 +37,12 @@ const getWaveletAppMock = vi.mocked(getWaveletApp);
 beforeEach(() => {
 	resetPrismaMock();
 	getWaveletAppMock.mockReset();
-	getWaveletAppMock.mockResolvedValue(null as any);
+	getWaveletAppMock.mockResolvedValue(null);
 });
 
 describe("saveTrack", () => {
 	it("upserts on userId_trackId composite and returns the row", async () => {
-		const row = { id: "s1", userId: "u1", trackId: "t1" } as any;
+		const row = { id: "s1", userId: "u1", trackId: "t1" };
 		prismaMock.savedTrack.upsert.mockResolvedValue(row);
 
 		const result = await saveTrack("u1", {
@@ -73,13 +73,13 @@ describe("saveTrack", () => {
 	});
 
 	it("defaults optional fields to null when omitted", async () => {
-		prismaMock.savedTrack.upsert.mockResolvedValue({} as any);
+		prismaMock.savedTrack.upsert.mockResolvedValue({});
 		await saveTrack("u1", {
 			trackId: "t1",
 			title: "T",
 			artist: "A",
 		});
-		const args = prismaMock.savedTrack.upsert.mock.calls[0][0] as any;
+		const args = prismaMock.savedTrack.upsert.mock.calls[0][0];
 		expect(args.create).toMatchObject({
 			album: null,
 			albumId: null,
@@ -91,13 +91,13 @@ describe("saveTrack", () => {
 
 describe("unsaveTrack", () => {
 	it("deletes the saved row for the user and attempts to evict", async () => {
-		prismaMock.savedTrack.deleteMany.mockResolvedValue({ count: 1 } as any);
+		prismaMock.savedTrack.deleteMany.mockResolvedValue({ count: 1 });
 		// Force refs to all be 0 so maybeEvictFile -> forceEvictFile is called
-		prismaMock.savedTrack.count.mockResolvedValue(0 as any);
-		prismaMock.albumTrack.count.mockResolvedValue(0 as any);
-		prismaMock.sharedTrack.count.mockResolvedValue(0 as any);
-		prismaMock.recentPlay.count.mockResolvedValue(0 as any);
-		prismaMock.storedTrack.findMany.mockResolvedValue([] as any);
+		prismaMock.savedTrack.count.mockResolvedValue(0);
+		prismaMock.albumTrack.count.mockResolvedValue(0);
+		prismaMock.sharedTrack.count.mockResolvedValue(0);
+		prismaMock.recentPlay.count.mockResolvedValue(0);
+		prismaMock.storedTrack.findMany.mockResolvedValue([]);
 
 		await unsaveTrack("u1", "t1");
 
@@ -107,11 +107,11 @@ describe("unsaveTrack", () => {
 	});
 
 	it("does not call forceEvictFile when there are still references", async () => {
-		prismaMock.savedTrack.deleteMany.mockResolvedValue({ count: 1 } as any);
-		prismaMock.savedTrack.count.mockResolvedValue(1 as any);
-		prismaMock.albumTrack.count.mockResolvedValue(0 as any);
-		prismaMock.sharedTrack.count.mockResolvedValue(0 as any);
-		prismaMock.recentPlay.count.mockResolvedValue(0 as any);
+		prismaMock.savedTrack.deleteMany.mockResolvedValue({ count: 1 });
+		prismaMock.savedTrack.count.mockResolvedValue(1);
+		prismaMock.albumTrack.count.mockResolvedValue(0);
+		prismaMock.sharedTrack.count.mockResolvedValue(0);
+		prismaMock.recentPlay.count.mockResolvedValue(0);
 
 		await unsaveTrack("u1", "t1");
 
@@ -122,7 +122,7 @@ describe("unsaveTrack", () => {
 
 describe("isTrackSaved", () => {
 	it("returns true when a row is found", async () => {
-		prismaMock.savedTrack.findUnique.mockResolvedValue({ id: "x" } as any);
+		prismaMock.savedTrack.findUnique.mockResolvedValue({ id: "x" });
 		const result = await isTrackSaved("u1", "t1");
 		expect(result).toBe(true);
 		expect(prismaMock.savedTrack.findUnique).toHaveBeenCalledWith({
@@ -150,7 +150,7 @@ describe("getSavedTrackIds", () => {
 		prismaMock.savedTrack.findMany.mockResolvedValue([
 			{ trackId: "t1" },
 			{ trackId: "t3" },
-		] as any);
+		]);
 
 		const result = await getSavedTrackIds("u1", ["t1", "t2", "t3"]);
 		expect(result).toBeInstanceOf(Set);
@@ -164,7 +164,7 @@ describe("getSavedTrackIds", () => {
 
 describe("listSavedTracks", () => {
 	it("orders by savedAt desc and passes take/skip from opts", async () => {
-		const items = [{ id: "1" }, { id: "2" }] as any;
+		const items = [{ id: "1" }, { id: "2" }];
 		prismaMock.savedTrack.findMany.mockResolvedValue(items);
 
 		const result = await listSavedTracks("u1", { limit: 50, offset: 25 });
@@ -178,7 +178,7 @@ describe("listSavedTracks", () => {
 	});
 
 	it("passes undefined take/skip when no opts provided", async () => {
-		prismaMock.savedTrack.findMany.mockResolvedValue([] as any);
+		prismaMock.savedTrack.findMany.mockResolvedValue([]);
 		await listSavedTracks("u1");
 		expect(prismaMock.savedTrack.findMany).toHaveBeenCalledWith({
 			where: { userId: "u1" },
@@ -191,10 +191,10 @@ describe("listSavedTracks", () => {
 
 describe("saveAlbum", () => {
 	it("upserts the album, deletes existing tracks, and creates the new tracklist", async () => {
-		const saved = { id: "alb-internal-1" } as any;
+		const saved = { id: "alb-internal-1" };
 		prismaMock.album.upsert.mockResolvedValue(saved);
-		prismaMock.albumTrack.deleteMany.mockResolvedValue({ count: 0 } as any);
-		prismaMock.albumTrack.createMany.mockResolvedValue({ count: 2 } as any);
+		prismaMock.albumTrack.deleteMany.mockResolvedValue({ count: 0 });
+		prismaMock.albumTrack.createMany.mockResolvedValue({ count: 2 });
 
 		const result = await saveAlbum(
 			"u1",
@@ -272,8 +272,8 @@ describe("saveAlbum", () => {
 	});
 
 	it("does not call createMany when there are no tracks", async () => {
-		prismaMock.album.upsert.mockResolvedValue({ id: "alb-1" } as any);
-		prismaMock.albumTrack.deleteMany.mockResolvedValue({ count: 0 } as any);
+		prismaMock.album.upsert.mockResolvedValue({ id: "alb-1" });
+		prismaMock.albumTrack.deleteMany.mockResolvedValue({ count: 0 });
 
 		await saveAlbum(
 			"u1",
@@ -299,13 +299,13 @@ describe("unsaveAlbum", () => {
 		prismaMock.album.findUnique.mockResolvedValue({
 			id: "alb-1",
 			tracks: [{ trackId: "t1" }, { trackId: "t2" }],
-		} as any);
-		prismaMock.album.delete.mockResolvedValue({} as any);
-		prismaMock.savedTrack.count.mockResolvedValue(0 as any);
-		prismaMock.albumTrack.count.mockResolvedValue(0 as any);
-		prismaMock.sharedTrack.count.mockResolvedValue(0 as any);
-		prismaMock.recentPlay.count.mockResolvedValue(0 as any);
-		prismaMock.storedTrack.findMany.mockResolvedValue([] as any);
+		});
+		prismaMock.album.delete.mockResolvedValue({});
+		prismaMock.savedTrack.count.mockResolvedValue(0);
+		prismaMock.albumTrack.count.mockResolvedValue(0);
+		prismaMock.sharedTrack.count.mockResolvedValue(0);
+		prismaMock.recentPlay.count.mockResolvedValue(0);
+		prismaMock.storedTrack.findMany.mockResolvedValue([]);
 
 		await unsaveAlbum("u1", "deezer-abc");
 
@@ -320,7 +320,7 @@ describe("unsaveAlbum", () => {
 
 describe("listSavedAlbums", () => {
 	it("returns albums ordered by savedAt desc", async () => {
-		const items = [{ id: "a1" }, { id: "a2" }] as any;
+		const items = [{ id: "a1" }, { id: "a2" }];
 		prismaMock.album.findMany.mockResolvedValue(items);
 
 		const result = await listSavedAlbums("u1");
@@ -344,7 +344,7 @@ describe("getSavedAlbumIds", () => {
 		prismaMock.album.findMany.mockResolvedValue([
 			{ deezerAlbumId: "a1" },
 			{ deezerAlbumId: "a3" },
-		] as any);
+		]);
 
 		const result = await getSavedAlbumIds("u1", ["a1", "a2", "a3"]);
 		expect([...result].sort()).toEqual(["a1", "a3"]);
@@ -357,10 +357,10 @@ describe("getSavedAlbumIds", () => {
 
 describe("getTrackRefCount", () => {
 	it("aggregates counts from all 4 ref tables", async () => {
-		prismaMock.savedTrack.count.mockResolvedValue(2 as any);
-		prismaMock.albumTrack.count.mockResolvedValue(3 as any);
-		prismaMock.sharedTrack.count.mockResolvedValue(1 as any);
-		prismaMock.recentPlay.count.mockResolvedValue(4 as any);
+		prismaMock.savedTrack.count.mockResolvedValue(2);
+		prismaMock.albumTrack.count.mockResolvedValue(3);
+		prismaMock.sharedTrack.count.mockResolvedValue(1);
+		prismaMock.recentPlay.count.mockResolvedValue(4);
 
 		const result = await getTrackRefCount("t1");
 		expect(result).toEqual({
@@ -393,7 +393,7 @@ describe("getTrackRefCount", () => {
 
 describe("forceEvictFile", () => {
 	it("returns 0 and skips work when no StoredTrack rows exist", async () => {
-		prismaMock.storedTrack.findMany.mockResolvedValue([] as any);
+		prismaMock.storedTrack.findMany.mockResolvedValue([]);
 		const result = await forceEvictFile("t1");
 		expect(result).toBe(0);
 		expect(prismaMock.storedTrack.deleteMany).not.toHaveBeenCalled();
@@ -404,9 +404,9 @@ describe("forceEvictFile", () => {
 		prismaMock.storedTrack.findMany.mockResolvedValue([
 			{ id: "st1", storagePath: "/p1" },
 			{ id: "st2", storagePath: "/p2" },
-		] as any);
-		prismaMock.sharedTrack.updateMany.mockResolvedValue({ count: 0 } as any);
-		prismaMock.storedTrack.deleteMany.mockResolvedValue({ count: 2 } as any);
+		]);
+		prismaMock.sharedTrack.updateMany.mockResolvedValue({ count: 0 });
+		prismaMock.storedTrack.deleteMany.mockResolvedValue({ count: 2 });
 
 		// no storage provider => deleted counter stays 0
 		const result = await forceEvictFile("t1");
@@ -425,13 +425,13 @@ describe("forceEvictFile", () => {
 		const deleteFile = vi.fn().mockResolvedValue(undefined);
 		getWaveletAppMock.mockResolvedValue({
 			storageProvider: { deleteFile },
-		} as any);
+		} as never);
 		prismaMock.storedTrack.findMany.mockResolvedValue([
 			{ id: "st1", storagePath: "/p1" },
 			{ id: "st2", storagePath: "/p2" },
-		] as any);
-		prismaMock.sharedTrack.updateMany.mockResolvedValue({ count: 0 } as any);
-		prismaMock.storedTrack.deleteMany.mockResolvedValue({ count: 2 } as any);
+		]);
+		prismaMock.sharedTrack.updateMany.mockResolvedValue({ count: 0 });
+		prismaMock.storedTrack.deleteMany.mockResolvedValue({ count: 2 });
 
 		const result = await forceEvictFile("t1");
 		expect(result).toBe(2);
@@ -443,11 +443,11 @@ describe("forceEvictFile", () => {
 
 describe("maybeEvictFile", () => {
 	it("triggers forceEvictFile when total refs are 0", async () => {
-		prismaMock.savedTrack.count.mockResolvedValue(0 as any);
-		prismaMock.albumTrack.count.mockResolvedValue(0 as any);
-		prismaMock.sharedTrack.count.mockResolvedValue(0 as any);
-		prismaMock.recentPlay.count.mockResolvedValue(0 as any);
-		prismaMock.storedTrack.findMany.mockResolvedValue([] as any);
+		prismaMock.savedTrack.count.mockResolvedValue(0);
+		prismaMock.albumTrack.count.mockResolvedValue(0);
+		prismaMock.sharedTrack.count.mockResolvedValue(0);
+		prismaMock.recentPlay.count.mockResolvedValue(0);
+		prismaMock.storedTrack.findMany.mockResolvedValue([]);
 
 		await maybeEvictFile("t1");
 
@@ -458,10 +458,10 @@ describe("maybeEvictFile", () => {
 	});
 
 	it("does not call forceEvictFile when refs > 0", async () => {
-		prismaMock.savedTrack.count.mockResolvedValue(0 as any);
-		prismaMock.albumTrack.count.mockResolvedValue(0 as any);
-		prismaMock.sharedTrack.count.mockResolvedValue(1 as any);
-		prismaMock.recentPlay.count.mockResolvedValue(0 as any);
+		prismaMock.savedTrack.count.mockResolvedValue(0);
+		prismaMock.albumTrack.count.mockResolvedValue(0);
+		prismaMock.sharedTrack.count.mockResolvedValue(1);
+		prismaMock.recentPlay.count.mockResolvedValue(0);
 
 		await maybeEvictFile("t1");
 
@@ -473,7 +473,7 @@ describe("isPreCacheEnabled", () => {
 	it("returns true when preferences.preCacheSaved is true", async () => {
 		prismaMock.userPreferences.findUnique.mockResolvedValue({
 			preferences: { preCacheSaved: true },
-		} as any);
+		});
 
 		const result = await isPreCacheEnabled("u1");
 		expect(result).toBe(true);
@@ -486,12 +486,12 @@ describe("isPreCacheEnabled", () => {
 	it("returns false when preferences.preCacheSaved is missing/false", async () => {
 		prismaMock.userPreferences.findUnique.mockResolvedValue({
 			preferences: { other: true },
-		} as any);
+		});
 		expect(await isPreCacheEnabled("u1")).toBe(false);
 
 		prismaMock.userPreferences.findUnique.mockResolvedValue({
 			preferences: { preCacheSaved: false },
-		} as any);
+		});
 		expect(await isPreCacheEnabled("u1")).toBe(false);
 	});
 
@@ -507,11 +507,11 @@ describe("reorderPlaylist", () => {
 			{ trackId: "a" },
 			{ trackId: "b" },
 			{ trackId: "c" },
-		] as any);
-		prismaMock.$transaction.mockResolvedValue([] as any);
-		prismaMock.playlist.update.mockResolvedValue({} as any);
+		]);
+		prismaMock.$transaction.mockResolvedValue([]);
+		prismaMock.playlist.update.mockResolvedValue({});
 		// Each .update returns a thenable so the array we pass to $transaction is well-typed.
-		prismaMock.playlistTrack.update.mockResolvedValue({} as any);
+		prismaMock.playlistTrack.update.mockResolvedValue({});
 
 		const result = await reorderPlaylist("pl1", ["c", "a", "b"]);
 
@@ -544,7 +544,7 @@ describe("reorderPlaylist", () => {
 		prismaMock.playlistTrack.findMany.mockResolvedValue([
 			{ trackId: "a" },
 			{ trackId: "b" },
-		] as any);
+		]);
 
 		await expect(reorderPlaylist("pl1", ["a"])).rejects.toThrow("REORDER_LENGTH_MISMATCH");
 		await expect(reorderPlaylist("pl1", ["a", "b", "c"])).rejects.toThrow(
@@ -559,7 +559,7 @@ describe("reorderPlaylist", () => {
 		prismaMock.playlistTrack.findMany.mockResolvedValue([
 			{ trackId: "a" },
 			{ trackId: "b" },
-		] as any);
+		]);
 
 		await expect(reorderPlaylist("pl1", ["a", "a"])).rejects.toThrow(
 			"REORDER_DUPLICATE_TRACK"
@@ -571,7 +571,7 @@ describe("reorderPlaylist", () => {
 		prismaMock.playlistTrack.findMany.mockResolvedValue([
 			{ trackId: "a" },
 			{ trackId: "b" },
-		] as any);
+		]);
 
 		await expect(reorderPlaylist("pl1", ["a", "z"])).rejects.toThrow(
 			"REORDER_UNKNOWN_TRACK"
@@ -582,7 +582,7 @@ describe("reorderPlaylist", () => {
 
 describe("followArtist", () => {
 	it("upserts on userId_deezerArtistId composite and returns the row", async () => {
-		const row = { id: "f1", userId: "u1", deezerArtistId: "27" } as any;
+		const row = { id: "f1", userId: "u1", deezerArtistId: "27" };
 		prismaMock.followedArtist.upsert.mockResolvedValue(row);
 
 		const result = await followArtist("u1", {
@@ -608,7 +608,7 @@ describe("followArtist", () => {
 	});
 
 	it("normalizes a missing pictureUrl to null on both update and create branches", async () => {
-		prismaMock.followedArtist.upsert.mockResolvedValue({} as any);
+		prismaMock.followedArtist.upsert.mockResolvedValue({});
 
 		await followArtist("u1", { deezerArtistId: "27", name: "Daft Punk" });
 
@@ -620,7 +620,7 @@ describe("followArtist", () => {
 
 describe("unfollowArtist", () => {
 	it("removes the (userId, deezerArtistId) row when it exists", async () => {
-		prismaMock.followedArtist.deleteMany.mockResolvedValue({ count: 1 } as any);
+		prismaMock.followedArtist.deleteMany.mockResolvedValue({ count: 1 });
 
 		await unfollowArtist("u1", "27");
 
@@ -630,14 +630,14 @@ describe("unfollowArtist", () => {
 	});
 
 	it("is idempotent — deleteMany returning count:0 does not throw", async () => {
-		prismaMock.followedArtist.deleteMany.mockResolvedValue({ count: 0 } as any);
+		prismaMock.followedArtist.deleteMany.mockResolvedValue({ count: 0 });
 		await expect(unfollowArtist("u1", "doesnotexist")).resolves.toBeUndefined();
 	});
 });
 
 describe("isArtistFollowed", () => {
 	it("returns true when the (userId, deezerArtistId) row exists", async () => {
-		prismaMock.followedArtist.findUnique.mockResolvedValue({ id: "f1" } as any);
+		prismaMock.followedArtist.findUnique.mockResolvedValue({ id: "f1" });
 		expect(await isArtistFollowed("u1", "27")).toBe(true);
 	});
 
@@ -652,7 +652,7 @@ describe("getFollowedArtistIds", () => {
 		prismaMock.followedArtist.findMany.mockResolvedValue([
 			{ deezerArtistId: "27" },
 			{ deezerArtistId: "55" },
-		] as any);
+		]);
 
 		const result = await getFollowedArtistIds("u1", ["27", "55", "99"]);
 		expect(result).toEqual(new Set(["27", "55"]));
@@ -675,7 +675,7 @@ describe("listFollowedArtists", () => {
 			{ id: "f1", deezerArtistId: "27" },
 			{ id: "f2", deezerArtistId: "55" },
 		];
-		prismaMock.followedArtist.findMany.mockResolvedValue(rows as any);
+		prismaMock.followedArtist.findMany.mockResolvedValue(rows);
 
 		const result = await listFollowedArtists("u1");
 		expect(result).toBe(rows);
@@ -688,7 +688,7 @@ describe("listFollowedArtists", () => {
 	});
 
 	it("forwards limit + offset to Prisma when supplied", async () => {
-		prismaMock.followedArtist.findMany.mockResolvedValue([] as any);
+		prismaMock.followedArtist.findMany.mockResolvedValue([]);
 
 		await listFollowedArtists("u1", { limit: 20, offset: 40 });
 

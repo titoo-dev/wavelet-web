@@ -73,7 +73,7 @@ async function downloadImageWithProvider(
 	try {
 		await pipeline(downloadStream, fileWriterStream);
 		await storageProvider.finalizeStream(path);
-	} catch (e: any) {
+	} catch (e: unknown) {
 		await storageProvider.deleteFile(path);
 		if (e instanceof HTTPError) {
 			if (url.includes("images.dzcdn.net")) {
@@ -102,7 +102,7 @@ async function downloadImageWithProvider(
 				"ERR_STREAM_PREMATURE_CLOSE",
 				"ETIMEDOUT",
 				"ECONNRESET",
-			].includes(e.code) ||
+			].includes((e as { code?: string }).code) ||
 			(downloadStream.destroyed && error === "DownloadTimeout")
 		) {
 			if (_retryCount >= MAX_IMAGE_RETRIES) return null;
@@ -155,7 +155,7 @@ async function downloadImageLocal(
 
 	try {
 		await pipeline(downloadStream, fileWriterStream);
-	} catch (e: any) {
+	} catch (e: unknown) {
 		unlinkSync(path);
 		if (e instanceof HTTPError) {
 			if (url.includes("images.dzcdn.net")) {
@@ -183,7 +183,7 @@ async function downloadImageLocal(
 				"ERR_STREAM_PREMATURE_CLOSE",
 				"ETIMEDOUT",
 				"ECONNRESET",
-			].includes(e.code) ||
+			].includes((e as { code?: string }).code) ||
 			(downloadStream.destroyed && error === "DownloadTimeout")
 		) {
 			if (_retryCount >= MAX_IMAGE_RETRIES) return null;

@@ -3,6 +3,7 @@ import {
 	TrackFormats,
 	utils,
 	type APIAlbum,
+	type APIArtist,
 	type APIPlaylist,
 	type APITrack,
 	type EnrichedAPITrack,
@@ -17,7 +18,7 @@ import {
 	removeFeatures,
 } from "../utils/index";
 import { Album } from "./Album";
-import { Artist } from "./Artist";
+import { Artist, type ArtistsByRole } from "./Artist";
 import { CustomDate } from "./CustomDate";
 import { VARIOUS_ARTISTS } from "./index";
 import { Lyrics } from "./Lyrics";
@@ -25,6 +26,7 @@ import { Picture } from "./Picture";
 import { Playlist } from "./Playlist";
 import type { Settings } from "./Settings";
 import { cachedMetadata } from "../cache/metadata-cache";
+import type { GwFilesize } from "@/lib/deezer/gw";
 
 const { mapGwTrackToDeezer: map_track, map_album } = utils;
 
@@ -49,19 +51,20 @@ class Track {
 	trackTokenExpiration?: number;
 	duration: number;
 	fallbackID: number;
-	albumsFallback: any[];
-	filesizes: Record<string, any>;
+	albumsFallback: string[];
+	filesizes: Record<string, GwFilesize>;
 	local: boolean;
 	mainArtist: Artist | null;
-	artist: { Main: any[]; Featured?: any[] };
-	artists: any[];
+	artist: ArtistsByRole;
+	artists: string[];
 	album: Album | null;
 	trackNumber: number;
 	discNumber: number;
 	date: CustomDate;
 	lyrics: Lyrics | null;
 	bpm: number;
-	contributors: Record<string, any>;
+	/** Names by role ("composer", "producer", …), as the tagger reads them. */
+	contributors: Record<string, string[]>;
 	copyright: string;
 	explicit: boolean;
 	ISRC: string;
@@ -77,8 +80,8 @@ class Track {
 	fullArtistsString: string;
 	urls: Partial<Record<(typeof formatsName)[keyof typeof formatsName], string>>;
 	downloadURL: string;
-	rank: any;
-	artistString: any;
+	rank: number;
+	artistString: string;
 
 	constructor() {
 		this.id = 0;
@@ -215,7 +218,7 @@ class Track {
 				} catch {
 					albumAPI_gw = {};
 				}
-				if (!albumAPI) albumAPI = <any>{};
+				if (!albumAPI) albumAPI = <APIAlbum>{};
 				albumAPI = { ...albumAPI_gw, ...albumAPI };
 			}
 
@@ -230,9 +233,9 @@ class Track {
 			if (!this.album.mainArtist.pic.md5) {
 				const artistId = this.album.mainArtist.id;
 				try {
-					const artistAPI: any = await cachedMetadata(`api.artist:${artistId}`, () =>
+					const artistAPI = (await cachedMetadata(`api.artist:${artistId}`, () =>
 						dz.api.get_artist(artistId)
-					);
+					)) as APIArtist;
 					this.album.mainArtist.pic.md5 = artistAPI.picture_small.slice(
 						artistAPI.picture_small.search("artist/") + 7,
 						-24
@@ -296,7 +299,10 @@ class Track {
 			this.replayGain = generateReplayGainString(trackAPI.gain);
 		this.ISRC = trackAPI.isrc;
 		this.trackNumber = trackAPI.track_position;
-		this.contributors = trackAPI.contributors;
+		// TODO: this is the API's contributor list, not the role → names map the
+		// tagger reads (song_contributors), so composer / involved-people tags
+		// are never written. Kept as is: changing it changes every tagged file.
+		this.contributors = trackAPI.contributors as unknown as Record<string, string[]>;
 		this.rank = trackAPI.rank;
 		this.bpm = trackAPI.bpm;
 
@@ -316,7 +322,7 @@ class Track {
 			this.date.fixDayMonth();
 		}
 
-		trackAPI.contributors?.forEach((artist: any) => {
+		trackAPI.contributors?.forEach((artist) => {
 			const isVariousArtists = artist.id === VARIOUS_ARTISTS;
 			const isMainArtist = artist.role === "Main";
 
@@ -338,7 +344,7 @@ class Track {
 		});
 
 		if (trackAPI.alternative_albums) {
-			trackAPI.alternative_albums.data.forEach((album: any) => {
+			trackAPI.alternative_albums.data.forEach((album) => {
 				if (
 					album.RIGHTS.STREAM_ADS_AVAILABLE ||
 					album.RIGHTS.STREAM_SUB_AVAILABLE

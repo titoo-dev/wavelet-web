@@ -1,29 +1,30 @@
-import { Artist } from "./Artist";
+import type { APIPlaylist } from "@/lib/deezer";
+import { Artist, type ArtistsByRole } from "./Artist";
 import { CustomDate } from "./CustomDate";
 import { Picture, StaticPicture } from "./Picture";
 
 export class Playlist {
 	id: string;
-	title: any;
-	artist: { Main: any[] };
-	artists: any[];
-	trackTotal: any;
+	title: string;
+	artist: ArtistsByRole;
+	artists: string[];
+	trackTotal: number;
 	recordType: string;
 	barcode: string;
 	label: string;
-	explicit: any;
+	explicit: boolean;
 	genre: string[];
 	date: CustomDate;
 	dateString?: string;
 	discTotal: string;
-	playlistID: any;
-	owner: any;
+	playlistID: string;
+	owner: APIPlaylist["creator"];
 	pic: Picture | StaticPicture;
 	variousArtists: Artist;
-	mainArtist: any;
+	mainArtist: Artist;
 	bitrate?: number;
 
-	constructor(playlistAPI) {
+	constructor(playlistAPI: APIPlaylist) {
 		this.id = `pl_${playlistAPI.id}`;
 		this.title = playlistAPI.title;
 		this.artist = { Main: [] };
