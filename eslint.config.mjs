@@ -7,6 +7,13 @@ const NO_RELOAD = "Full page loads stop playback and reset the app — navigate 
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  // A leading underscore marks an argument unused on purpose (interface
+  // methods, typed mock signatures).
+  {
+    rules: {
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
+    },
+  },
   // The app must never reload itself: no hard navigations from app code.
   {
     files: ["src/**/*.{ts,tsx}"],
