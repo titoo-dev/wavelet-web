@@ -22,6 +22,9 @@ export function toObjectKey(storagePath: string): string {
 /** Prefix of every object written by progressive persists (C9). */
 export const TRACKS_PREFIX = "tracks/";
 
+/** Prefix of the rendered Lyrics Stories: `stories/{userId}/{renderId}.mp4`, deleted 24 h after ready. */
+export const STORIES_PREFIX = "stories/";
+
 const EXTENSIONS: Record<number, string> = {
 	9: ".flac", // FLAC
 	3: ".mp3", // MP3_320
@@ -51,6 +54,8 @@ export function trackObjectKey(trackId: string | number, bitrate: number): strin
 }
 
 export function inferContentType(path: string): string {
+	// Lyrics Stories (src/lib/story/story-render.ts) are videos; every other .mp4 is a Deezer MP4 track.
+	if (toObjectKey(path).startsWith(STORIES_PREFIX)) return "video/mp4";
 	const ext = path.split(".").pop()?.toLowerCase();
 	switch (ext) {
 		case "flac":

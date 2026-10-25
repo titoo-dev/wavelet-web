@@ -602,6 +602,31 @@ const schemas = {
 		},
 		["theme", "title", "artist", "lines", "trackDurationMs"]
 	),
+	CreateStoryInput: {
+		allOf: [
+			ref("ThemeStillInput"),
+			obj({ trackId: str({ pattern: "^\\d+$", description: "Deezer track id" }) }, ["trackId"]),
+		],
+	},
+	StoryRender: obj(
+		{
+			id: str(),
+			status: str({ enum: ["queued", "rendering", "ready", "failed", "expired"], description: "`expired`: was ready, the MP4 is gone (kept 24 h)" }),
+			progress: { type: "number", minimum: 0, maximum: 1 },
+			trackId: str(),
+			theme: str({ enum: ["blurred-cover", "palette", "minimal", "vinyl"] }),
+			startMs: int({ description: "Excerpt start in the track, ms" }),
+			endMs: int({ description: "Excerpt end in the track, ms" }),
+			createdAt: dt(),
+			readyAt: ndt(),
+			expiresAt: ndt({ description: "When the MP4 stops being downloadable (readyAt + 24 h)" }),
+			size: nint({ description: "MP4 size in bytes, while ready" }),
+			url: nstr({ description: "Presigned download URL of the MP4 (1080×1920 H.264 + AAC), while ready; GET /api/v1/stories/{renderId} only" }),
+			urlExpiresAt: dt({ description: "When `url` stops working (1 h); GET only, when ready" }),
+			error: nstr({ enum: ["NO_DEEZER", "AUDIO_UNAVAILABLE", "RENDER_FAILED", "TIMED_OUT", null], description: "Why it failed; null otherwise" }),
+		},
+		["id", "status", "progress", "trackId", "theme", "startMs", "endMs", "createdAt", "readyAt", "expiresAt", "size", "url", "error"]
+	),
 	SharedTrack: obj(
 		{
 			id: str(),
@@ -1449,6 +1474,36 @@ const paths = {
 	},
 
 	// ─── Lyrics Stories ───
+	"/api/v1/stories": {
+		post: {
+			tags: ["Stories"],
+			operationId: "createStoryRender",
+			summary: "Render a Lyrics Story (MP4) of a Lyrics Range",
+			description: "Same range rules as the Theme Stills. **202** with a new `queued` render: it is drawn after the response (about 15–45 s for 30 s of video); follow it with `GET /api/v1/stories/{renderId}`. **200** with the same request's render (same track, range, lines and theme) when it is queued, rendering or ready less than 24 h ago. **409** `RENDER_IN_PROGRESS` while another of your renders runs (its id in `X-Story-Render-Id`). **429** `DAILY_LIMIT` after 20 renders in 24 h (failed ones not counted). The audio comes from the cached copy, else your Deezer session.",
+			security: userAuth,
+			requestBody: body(ref("CreateStoryInput")),
+			responses: {
+				...okRes("StoryRenderEnvelope", ref("StoryRender"), "The same request's render, reused"),
+				...okRes("StoryRenderEnvelope", ref("StoryRender"), "Render queued", "202"),
+				...E_400,
+				409: err("StoryInProgress"),
+				429: err("StoryLimited"),
+				...E_USER,
+			},
+			"x-error-codes": ["INVALID_BODY", "MISSING_TRACK_ID", "INVALID_THEME", "MISSING_METADATA", "INVALID_RANGE", "RENDER_IN_PROGRESS", "DAILY_LIMIT"],
+		},
+	},
+	"/api/v1/stories/{renderId}": {
+		parameters: [pathParam("renderId", "Story Render id")],
+		get: {
+			tags: ["Stories"],
+			operationId: "getStoryRender",
+			summary: "Status of one of your Story Renders, and its download link once ready",
+			description: "Poll every 2 s or so while `queued` / `rendering`. Once `ready`, `url` is a presigned link to the MP4 for 1 h (ask again for a fresh one) until `expiresAt`, 24 h after it was ready; after that the status is `expired`. A render silent for 6 min is `failed` with `TIMED_OUT`. Another user's render is a 404.",
+			security: userAuth,
+			responses: { ...okRes("StoryRenderEnvelope", ref("StoryRender")), ...E_404, ...E_USER },
+		},
+	},
 	"/api/v1/stories/stills": {
 		post: {
 			tags: ["Stories"],
@@ -1708,6 +1763,8 @@ const responses = {
 	NotFound: errorRes("`NOT_FOUND`"),
 	Gone: errorRes("`EXPIRED` or `SHARE_OWNER_OFFLINE`"),
 	RateLimited: errorRes("Upstream rate limit"),
+	StoryLimited: errorRes("`RATE_LIMITED` (Theme Stills, with `Retry-After`) or `DAILY_LIMIT` (Story Renders)"),
+	StoryInProgress: errorRes("`RENDER_IN_PROGRESS` — another of your Story Renders runs; its id is in `X-Story-Render-Id`"),
 	UpstreamError: errorRes("Upstream (Spotify) error"),
 	ServiceUnavailable: errorRes("Service not configured"),
 	NoDeezer: errorRes("`NO_DEEZER` — no user nor service Deezer session available"),

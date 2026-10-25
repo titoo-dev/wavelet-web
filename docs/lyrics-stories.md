@@ -1,6 +1,6 @@
 # Lyrics Stories — spec et plan d'implémentation
 
-Statut : **spécifié, spike validé** (2026-10-24). Un rendu de 30 s en 1080p prend environ 41 s sur Vercel (2 vCPU) avec 170 Mo de RAM ; le détail est dans l'ADR 0004. L'étape 1 est faite : Theme Stills en JPEG 720×1280, rendus en 20 à 50 ms. L'étape 2 (Story Render) est la prochaine. Le vocabulaire est défini dans `CONTEXT.md` (§ Lyrics Stories). Les décisions et leurs raisons sont dans docs/adr/0004 (rendu dans une fonction Vercel), 0005 (le client envoie les lignes) et 0006 (garde-fous).
+Statut : **spécifié, spike validé** (2026-10-24). Un rendu de 30 s en 1080p prend environ 41 s sur Vercel (2 vCPU) avec 170 Mo de RAM ; le détail est dans l'ADR 0004. L'étape 1 est faite : Theme Stills en JPEG 720×1280, rendus en 20 à 50 ms. L'étape 2 est faite : Story Render, avec un rendu réel de 25 s en 1080p en 14 s en local (`scripts/e2e-story.ts`). Les étapes 3 et 4 (mobile) sont les prochaines. Le vocabulaire est défini dans `CONTEXT.md` (§ Lyrics Stories). Les décisions et leurs raisons sont dans docs/adr/0004 (rendu dans une fonction Vercel), 0005 (le client envoie les lignes) et 0006 (garde-fous).
 
 ## Ce que voit l'utilisateur (mobile, v1)
 
@@ -36,7 +36,7 @@ Statut : **spécifié, spike validé** (2026-10-24). Un rendu de 30 s en 1080p p
 | Audio | Copie en cache dans R2 (`findCachedCopy`), sinon la plage est déchiffrée depuis Deezer avec l'ARL de l'utilisateur, à la qualité plafonnée par sa licence (`capByLicence`). |
 | Limites | 1 Story Render en cours par utilisateur, 20 par jour (les échecs ne comptent pas). Theme Stills : limite par minute contre les abus, sans quota journalier. |
 | Réutilisation | Même utilisateur, titre, plage (début et fin en ms), thème et texte (hash) dans les 24 h : on renvoie le Story Render existant. |
-| Durée de vie | Le MP4 sous `stories/{userId}/{renderId}.mp4` dans R2 est effacé 24 h après être prêt. La ligne est purgée après 7 jours. |
+| Durée de vie | Le MP4 sous `stories/{userId}/{renderId}.mp4` dans R2 n'est plus téléchargeable 24 h après être prêt (le statut passe à `expired`). Le cron quotidien l'efface au passage suivant, donc au plus 48 h après. La ligne est purgée après 7 jours. Pour un effacement à 24 h pile, ajouter une règle de cycle de vie R2 sur le préfixe `stories/` (1 jour). |
 | Accès | Connecté uniquement, chacun ne voit que ses Story Renders. Le MP4 est servi par une URL pré-signée d'1 h. |
 
 ## Thèmes
@@ -110,7 +110,7 @@ Chaque étape est une PR avec ses tests (règle « fix-bug-once » de CLAUDE.md)
 |---|---|---|---|
 | 0 ✅ | **Spike de faisabilité** (bloquant) — fait le 2026-10-24 : 41 s en 1080p, 21 s en 720p, branche `spike/story-render` (jetable) | Route jetable sur une Preview Vercel : 30 s, un thème, `@napi-rs/canvas` → `ffmpeg-static`, audio d'une copie R2 de dev. On mesure le temps, la mémoire, la taille du bundle et les cold starts. | Rendu < 120 s et bundle < 250 Mo. Sinon on passe en 720p, ou on revoit l'ADR 0004. |
 | 1 ✅ | **Cœur pur + Theme Stills** | `range.ts`, `timeline.ts`, `layout.ts`, les 4 thèmes, `fonts.ts`, la route `stills`, l'OpenAPI. | Tests unitaires des bornes et de la timeline, PNG de chaque thème vérifié à l'œil (script `scripts/story-stills.ts`). |
-| 2 | **Story Render serveur** | Modèle + migration, `audio-source.ts`, `render.ts`, POST et GET, réutilisation, limites, GC, `maxDuration`. | Tests des routes (création, réutilisation, quota, 1 en cours, accès d'un autre utilisateur → 404, échec → `failed` et réessayable). Script `scripts/e2e-story.ts` : rendu réel sur une base jetable et le bucket de dev, puis `ffprobe` (durée, 1080×1920, AAC). |
+| 2 ✅ | **Story Render serveur** | Modèle + migration, `audio-source.ts`, `render.ts`, POST et GET, réutilisation, limites, GC, `maxDuration`. | Tests des routes (création, réutilisation, quota, 1 en cours, accès d'un autre utilisateur → 404, échec → `failed` et réessayable). Le script `scripts/e2e-story.ts` fait un rendu réel (compte de service Deezer + LRCLIB, sans base ni R2) puis vérifie la durée, le 1080×1920 et l'AAC. |
 | 3 | **Mobile : sélection** | `range_selection.dart`, mode sélection dans la vue paroles (bouton, appui long), entrée dans le menu d'actions, Preview de l'extrait. | Tests unitaires de la sélection, tests de widget de la vue paroles. |
 | 4 | **Mobile : thèmes, rendu, partage** | Carrousel de Theme Stills, suivi + notification locale, téléchargement, écran de résultat, Partager, Enregistrer dans la galerie, permissions Android et iOS. | Tests de widget, puis essai sur l'émulateur Pixel_4a et un vrai téléphone : partage vers Instagram, TikTok et Facebook. |
 | 5 | **Livraison** | `CLAUDE.md` (stack + tableau), `docs/vercel.md`, client Dart si utilisé, `npm run e2e`, mise en prod du web, mobile v1.8.0 via Firebase. | Une story postée depuis la prod. |
