@@ -96,6 +96,8 @@ This project uses **Vitest 4** + **vitest-mock-extended** for tests. Config at `
 
 CI runs on every PR (`.github/workflows/ci.yml`): tests + coverage gate + `tsc --noEmit` + ESLint. Coverage thresholds: lines 90, branches 85, functions 90, statements 90 (global, scoped to the modules locked in — see `vitest.config.ts` `include`).
 
+ESLint is a required check with no debt left: `npm run lint` must end with 0 problems (warnings included). No `any`: use a real type, or `unknown` and narrow it. The only untyped seams are documented `eslint-disable-next-line` lines with a reason — `GwResults` in `src/lib/deezer/gw.ts` (schemaless gw-light JSON, also the raw items the search UI maps) and `prismaMock` in `src/test/helpers/mockPrisma.ts`; build on those instead of adding new ones. A test stub of a typed mock is `as never`, not `as any`. Arguments unused on purpose start with `_`.
+
 ### Locked-in surface (do not regress without a passing replacement test)
 
 | Domain | Source | Test |
