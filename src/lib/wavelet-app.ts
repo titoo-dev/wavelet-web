@@ -8,10 +8,12 @@ import type { Settings } from "@/lib/wavelet/types/Settings";
 import type { ConfigStore } from "@/lib/wavelet/config-store/ConfigStore";
 import type { StorageProvider } from "@/lib/wavelet/storage/StorageProvider";
 
-let loadSettings: any;
-let saveSettingsFn: any;
-let DEFAULT_SETTINGS: any;
-let createStorageProvider: any;
+type WaveletModule = typeof import("@/lib/wavelet");
+
+let loadSettings: WaveletModule["loadSettings"] | undefined;
+let saveSettingsFn: WaveletModule["saveSettings"] | undefined;
+let DEFAULT_SETTINGS: WaveletModule["DEFAULT_SETTINGS"] | undefined;
+let createStorageProvider: WaveletModule["createStorageProvider"] | undefined;
 let _initialized = false;
 
 async function ensureImports() {

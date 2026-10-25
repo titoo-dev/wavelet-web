@@ -11,12 +11,12 @@ export function isValidURL(text: string): boolean {
 	return deezerRegex.test(text) || spotifyRegex.test(text) || deezerPageLink.test(text);
 }
 
-export function debounce<T extends (...args: any[]) => any>(
-	func: T,
+export function debounce<A extends unknown[]>(
+	func: (...args: A) => unknown,
 	wait: number
-): (...args: Parameters<T>) => void {
+): (...args: A) => void {
 	let timeout: NodeJS.Timeout;
-	return (...args: Parameters<T>) => {
+	return (...args: A) => {
 		clearTimeout(timeout);
 		timeout = setTimeout(() => func(...args), wait);
 	};

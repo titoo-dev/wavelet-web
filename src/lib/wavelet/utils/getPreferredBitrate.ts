@@ -11,6 +11,7 @@ import {
 import { generateCryptedStreamURL } from "../decryption";
 import { PreferredBitrateNotFound, TrackNot360 } from "../errors";
 import Track from "../types/Track";
+import type { Listener } from "../types/listener";
 import { USER_AGENT_HEADER } from "../utils/core";
 import { trackUrlCache, trackUrlKey } from "../cache/deezer-track-cache";
 
@@ -46,7 +47,7 @@ export async function getPreferredBitrate(
 	shouldFallback: boolean,
 	feelingLucky: boolean,
 	uuid: string,
-	listener: any
+	listener: Listener
 ) {
 	let falledBack = false;
 	let hasAlternative = track.fallbackID !== 0;

@@ -40,11 +40,11 @@ describe("GET /api/v1/library/tracks", () => {
 		listSavedTracksMock.mockResolvedValue([
 			{ id: "s1", trackId: "t1" },
 			{ id: "s2", trackId: "t2" },
-		] as any);
+		] as never);
 
 		const res = await GET(makeNextRequest());
 		expect(res.status).toBe(200);
-		const body = await readJson<{ data: { items: any[] } }>(res);
+		const body = await readJson<{ data: { items: unknown[] } }>(res);
 		expect(body?.data.items).toHaveLength(2);
 		expect(listSavedTracksMock).toHaveBeenCalledWith("u1", {
 			limit: 100,
@@ -54,7 +54,7 @@ describe("GET /api/v1/library/tracks", () => {
 
 	it("uses default limit=100 when no query params are supplied", async () => {
 		setSessionUser("u1");
-		listSavedTracksMock.mockResolvedValue([] as any);
+		listSavedTracksMock.mockResolvedValue([]);
 
 		await GET(makeNextRequest());
 		expect(listSavedTracksMock).toHaveBeenCalledWith("u1", {
@@ -67,7 +67,7 @@ describe("GET /api/v1/library/tracks", () => {
 		// Current behavior: `parseInt("0") || 100` evaluates to 100, then clamp keeps 100.
 		// TODO: limit=0 arguably should clamp to 1 (the documented lower bound).
 		setSessionUser("u1");
-		listSavedTracksMock.mockResolvedValue([] as any);
+		listSavedTracksMock.mockResolvedValue([]);
 
 		await GET(
 			makeNextRequest({
@@ -82,7 +82,7 @@ describe("GET /api/v1/library/tracks", () => {
 
 	it("clamps a negative limit (-5) up to 1", async () => {
 		setSessionUser("u1");
-		listSavedTracksMock.mockResolvedValue([] as any);
+		listSavedTracksMock.mockResolvedValue([]);
 
 		await GET(
 			makeNextRequest({
@@ -97,7 +97,7 @@ describe("GET /api/v1/library/tracks", () => {
 
 	it("clamps limit=10000 to 500 (upper bound)", async () => {
 		setSessionUser("u1");
-		listSavedTracksMock.mockResolvedValue([] as any);
+		listSavedTracksMock.mockResolvedValue([]);
 
 		await GET(
 			makeNextRequest({
@@ -112,7 +112,7 @@ describe("GET /api/v1/library/tracks", () => {
 
 	it("passes a valid mid-range limit untouched", async () => {
 		setSessionUser("u1");
-		listSavedTracksMock.mockResolvedValue([] as any);
+		listSavedTracksMock.mockResolvedValue([]);
 
 		await GET(
 			makeNextRequest({
@@ -127,7 +127,7 @@ describe("GET /api/v1/library/tracks", () => {
 
 	it("clamps negative offset to 0", async () => {
 		setSessionUser("u1");
-		listSavedTracksMock.mockResolvedValue([] as any);
+		listSavedTracksMock.mockResolvedValue([]);
 
 		await GET(
 			makeNextRequest({
@@ -221,8 +221,8 @@ describe("POST /api/v1/library/tracks", () => {
 
 	it("calls saveTrack with normalized fields and returns the saved row", async () => {
 		setSessionUser("u1");
-		const savedRow = { id: "s1", trackId: "t1" } as any;
-		saveTrackMock.mockResolvedValue(savedRow);
+		const savedRow = { id: "s1", trackId: "t1" };
+		saveTrackMock.mockResolvedValue(savedRow as never);
 
 		const res = await POST(
 			makeNextRequest({
@@ -239,7 +239,7 @@ describe("POST /api/v1/library/tracks", () => {
 			})
 		);
 		expect(res.status).toBe(200);
-		const body = await readJson<{ data: { saved: any } }>(res);
+		const body = await readJson<{ data: { saved: unknown } }>(res);
 		expect(body?.data.saved).toEqual(savedRow);
 		expect(saveTrackMock).toHaveBeenCalledWith("u1", {
 			trackId: "t1",
@@ -254,7 +254,7 @@ describe("POST /api/v1/library/tracks", () => {
 
 	it("normalizes missing optional fields to null", async () => {
 		setSessionUser("u1");
-		saveTrackMock.mockResolvedValue({ id: "s1" } as any);
+		saveTrackMock.mockResolvedValue({ id: "s1" } as never);
 
 		await POST(
 			makeNextRequest({

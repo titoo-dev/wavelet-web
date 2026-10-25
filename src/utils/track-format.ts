@@ -1,8 +1,13 @@
+/** The fields of a gw or public API track the badge reads. */
+type BadgeSource = Partial<
+	Record<"FILESIZE_FLAC" | "FILESIZE_MP3_320" | "FILESIZE_MP3_256" | "FILESIZE_MP3_128", string | number>
+> & { bitrate?: number | string; preview?: string };
+
 /**
  * Compute the best available audio format label for a Deezer track.
  * GW API returns FILESIZE_FLAC, FILESIZE_MP3_320, etc. — non-zero means available.
  */
-export function getBitrateBadge(track: any): string {
+export function getBitrateBadge(track: BadgeSource | null | undefined): string {
 	if (!track) return "—";
 	if (Number(track.FILESIZE_FLAC) > 0) return "FLAC";
 	if (Number(track.FILESIZE_MP3_320) > 0) return "320";

@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 			return fail("INVALID_ID", "id must be a numeric Deezer id.", 400);
 		}
 
-		let data: any;
+		let data: Record<string, unknown>;
 
 		switch (type) {
 			case "album": {

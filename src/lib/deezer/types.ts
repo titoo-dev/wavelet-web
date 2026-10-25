@@ -1,3 +1,5 @@
+import type { GWAlbumFallback, GwFilesize, GWLyrics } from "./gw";
+
 // Number association for formats
 export const TrackFormats = {
 	FLAC: 9,
@@ -113,9 +115,8 @@ export interface APITrack {
 	gain: number;
 	available_countries: string[]; // List of countries as strings
 	alternative?: APITrack; // Assuming alternative is of type Track
-	alternative_albums?: {
-		data: APIAlbum[];
-	};
+	/** gw albums carrying the same recording (the track page ISRC block). */
+	alternative_albums?: { data: GWAlbumFallback[] };
 	contributors?: APIContributor[]; // Assuming Contributor is an object
 	md5_image: string;
 	track_token: string;
@@ -123,7 +124,8 @@ export interface APITrack {
 	album: APIAlbum;
 	size?: number;
 	lyrics_id?: string;
-	lyrics?: string;
+	/** Only gw has lyrics: the song.getLyrics answer. */
+	lyrics?: GWLyrics;
 	position?: number;
 	copyright?: string;
 	physical_release_date?: string;
@@ -145,28 +147,28 @@ export interface APIContributor {
 
 export interface APIPlaylist {
 	id?: string;
-	title?: any;
+	title?: string;
 	description?: string;
 	duration?: number;
-	public?: any;
+	public?: boolean;
 	is_loved_track?: boolean;
 	collaborative?: boolean;
-	nb_tracks?: any;
-	fans?: any;
+	nb_tracks?: number;
+	fans?: number;
 	link?: string;
-	share?: any;
-	picture?: any;
-	picture_small?: any;
-	picture_medium?: any;
-	picture_big?: any;
-	picture_xl?: any;
-	checksum?: any;
+	share?: string;
+	picture?: string;
+	picture_small?: string;
+	picture_medium?: string;
+	picture_big?: string;
+	picture_xl?: string;
+	checksum?: string;
 	tracklist?: string;
 	creation_date?: string;
-	creator?: any;
+	creator?: { id?: number | string; name?: string; type?: string };
 	type?: string;
-	various_artist?: any;
-	explicit?: any;
+	various_artist?: APIArtist;
+	explicit?: boolean;
 }
 
 // Contains additional information from GW
@@ -174,7 +176,7 @@ export interface EnrichedAPITrack
 	extends Omit<APITrack, "album" | "artist" | "contributors"> {
 	type?: string;
 	md5_origin?: number;
-	filesizes?: Record<string, any>;
+	filesizes?: Record<string, GwFilesize>;
 	media_version?: number;
 	track_token_expire?: number;
 	token: string;
@@ -185,12 +187,14 @@ export interface EnrichedAPITrack
 	digital_release_date?: string;
 	genre_id?: number;
 	copyright?: string;
-	lyrics?: string;
-	alternative_albums?: any;
+	/** Only gw has lyrics: the song.getLyrics answer. */
+	lyrics?: GWLyrics;
+	alternative_albums?: { data: GWAlbumFallback[] };
 	album?: EnrichedAPIAlbum;
 	artist: EnrichedAPIArtist;
 	contributors: EnrichedAPIContributor[];
-	song_contributors: EnrichedAPIContributor[];
+	/** gw SNG_CONTRIBUTORS: names by role (main_artist, composer, …). */
+	song_contributors: Record<string, string[]>;
 }
 
 export interface EnrichedAPIContributor extends APIContributor {
@@ -198,7 +202,7 @@ export interface EnrichedAPIContributor extends APIContributor {
 	tracklist: string;
 	type: string;
 	order: string;
-	rank: any;
+	rank: number;
 }
 
 export interface EnrichedAPIAlbum extends APIAlbum {

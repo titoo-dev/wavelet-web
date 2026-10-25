@@ -24,7 +24,7 @@ beforeEach(() => {
 	resetPrismaMock();
 	clearSession();
 	libraryMock.maybeEvictFile.mockReset();
-	libraryMock.maybeEvictFile.mockResolvedValue(undefined as any);
+	libraryMock.maybeEvictFile.mockResolvedValue(undefined);
 	libraryMock.getTrackRefCount.mockReset();
 });
 
@@ -46,7 +46,7 @@ describe("GET /api/v1/recent-plays", () => {
 			{ id: "r1", trackId: "1", playedAt: new Date("2025-01-02") },
 			{ id: "r2", trackId: "2", playedAt: new Date("2025-01-01") },
 		];
-		prismaMock.recentPlay.findMany.mockResolvedValue(rows as any);
+		prismaMock.recentPlay.findMany.mockResolvedValue(rows);
 
 		const res = await GET(makeNextRequest());
 		expect(res.status).toBe(200);
@@ -192,7 +192,7 @@ describe("POST /api/v1/recent-plays", () => {
 
 	it("upserts the recent play and returns { logged: true } when under cap", async () => {
 		setSessionUser("u1");
-		prismaMock.recentPlay.upsert.mockResolvedValue({} as any);
+		prismaMock.recentPlay.upsert.mockResolvedValue({});
 		prismaMock.recentPlay.count.mockResolvedValue(1);
 
 		const res = await POST(
@@ -235,7 +235,7 @@ describe("POST /api/v1/recent-plays", () => {
 
 	it("uses default empty/null fields when only trackId is provided", async () => {
 		setSessionUser("u1");
-		prismaMock.recentPlay.upsert.mockResolvedValue({} as any);
+		prismaMock.recentPlay.upsert.mockResolvedValue({});
 		prismaMock.recentPlay.count.mockResolvedValue(0);
 
 		await POST(
@@ -257,14 +257,14 @@ describe("POST /api/v1/recent-plays", () => {
 
 	it("evicts the oldest entries when cap is exceeded", async () => {
 		setSessionUser("u1");
-		prismaMock.recentPlay.upsert.mockResolvedValue({} as any);
+		prismaMock.recentPlay.upsert.mockResolvedValue({});
 		prismaMock.recentPlay.count.mockResolvedValue(102); // cap+2
 		const oldRows = [
 			{ id: "old1", trackId: "t-old1" },
 			{ id: "old2", trackId: "t-old2" },
 		];
-		prismaMock.recentPlay.findMany.mockResolvedValue(oldRows as any);
-		prismaMock.recentPlay.deleteMany.mockResolvedValue({ count: 2 } as any);
+		prismaMock.recentPlay.findMany.mockResolvedValue(oldRows);
+		prismaMock.recentPlay.deleteMany.mockResolvedValue({ count: 2 });
 
 		const res = await POST(
 			makeNextRequest({ method: "POST", body: { trackId: "fresh" } })
@@ -287,12 +287,12 @@ describe("POST /api/v1/recent-plays", () => {
 
 	it("swallows individual eviction errors and still succeeds", async () => {
 		setSessionUser("u1");
-		prismaMock.recentPlay.upsert.mockResolvedValue({} as any);
+		prismaMock.recentPlay.upsert.mockResolvedValue({});
 		prismaMock.recentPlay.count.mockResolvedValue(101);
 		prismaMock.recentPlay.findMany.mockResolvedValue([
 			{ id: "old1", trackId: "t-old1" },
-		] as any);
-		prismaMock.recentPlay.deleteMany.mockResolvedValue({ count: 1 } as any);
+		]);
+		prismaMock.recentPlay.deleteMany.mockResolvedValue({ count: 1 });
 		libraryMock.maybeEvictFile.mockRejectedValueOnce(new Error("disk error"));
 		// silence the expected console.error
 		const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});

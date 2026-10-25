@@ -34,11 +34,11 @@ describe("GET /api/v1/library/albums", () => {
 		listSavedAlbumsMock.mockResolvedValue([
 			{ id: "a1" },
 			{ id: "a2" },
-		] as any);
+		] as never);
 
 		const res = await GET(makeNextRequest());
 		expect(res.status).toBe(200);
-		const body = await readJson<{ data: { items: any[] } }>(res);
+		const body = await readJson<{ data: { items: unknown[] } }>(res);
 		expect(body?.data.items).toHaveLength(2);
 		expect(listSavedAlbumsMock).toHaveBeenCalledWith("u1");
 	});
@@ -130,8 +130,8 @@ describe("POST /api/v1/library/albums", () => {
 
 	it("calls saveAlbum with normalized fields and returns the saved album", async () => {
 		setSessionUser("u1");
-		const savedRow = { id: "internal-1" } as any;
-		saveAlbumMock.mockResolvedValue(savedRow);
+		const savedRow = { id: "internal-1" };
+		saveAlbumMock.mockResolvedValue(savedRow as never);
 
 		const res = await POST(
 			makeNextRequest({
@@ -154,7 +154,7 @@ describe("POST /api/v1/library/albums", () => {
 			})
 		);
 		expect(res.status).toBe(200);
-		const body = await readJson<{ data: { saved: any } }>(res);
+		const body = await readJson<{ data: { saved: unknown } }>(res);
 		expect(body?.data.saved).toEqual(savedRow);
 
 		expect(saveAlbumMock).toHaveBeenCalledTimes(1);
@@ -180,7 +180,7 @@ describe("POST /api/v1/library/albums", () => {
 
 	it("normalizes track fields (coerces strings, defaults nullables)", async () => {
 		setSessionUser("u1");
-		saveAlbumMock.mockResolvedValue({ id: "x" } as any);
+		saveAlbumMock.mockResolvedValue({ id: "x" } as never);
 
 		await POST(
 			makeNextRequest({

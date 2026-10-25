@@ -64,7 +64,7 @@ async function warmInBackground(
 
 		// Also warm the per-format URL cache. getPreferredBitrate is parallel
 		// across formats and will fill trackUrlCache as a side effect.
-		const apiTrack: any = mapGwTrackToDeezer(gwTrack);
+		const apiTrack = mapGwTrackToDeezer(gwTrack);
 		const track = new Track();
 		track.parseEssentialData(apiTrack);
 		if (track.local) return;

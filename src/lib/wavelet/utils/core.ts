@@ -103,7 +103,7 @@ export function andCommaConcat(list: string[]) {
 	return result;
 }
 
-export function uniqueArray(arr: any[]) {
+export function uniqueArray(arr: string[]) {
 	arr.forEach((namePrinc, iPrinc) => {
 		arr.forEach((nameRest, iRest) => {
 			if (

@@ -23,7 +23,7 @@ import { mockDeep, mockReset } from "vitest-mock-extended";
  *     prismaMock.storedTrack.findFirst.mockResolvedValue({ ... });
  *   });
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped on purpose, see above (TS2615 on the real PrismaClient)
 export const prismaMock: any = mockDeep<any>();
 
 export function resetPrismaMock() {

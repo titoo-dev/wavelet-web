@@ -23,7 +23,7 @@ const blobRow = {
 	bitrate: 320,
 	storagePath: "music/foo.mp3",
 	storageType: "r2",
-} as any;
+};
 
 function fakeBody() {
 	return new ReadableStream({
@@ -84,7 +84,7 @@ describe("GET /api/v1/stream/[trackId]", () => {
 			contentLength: 12345,
 			contentType: "audio/mpeg",
 			statusCode: 200,
-		} as any);
+		} as never);
 
 		const res = await GET(makeNextRequest(), makeParams({ trackId: "1" }));
 		expect(res.status).toBe(200);
@@ -106,7 +106,7 @@ describe("GET /api/v1/stream/[trackId]", () => {
 			contentRange: "bytes 0-99/12345",
 			contentType: "audio/mpeg",
 			statusCode: 206,
-		} as any);
+		});
 
 		const res = await GET(
 			makeNextRequest({ headers: { range: "bytes=0-99" } }),

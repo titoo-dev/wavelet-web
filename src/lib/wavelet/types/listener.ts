@@ -1,3 +1,3 @@
 export interface Listener {
-	send: (key: string, data?: any) => void;
+	send: (key: string, data?: unknown) => void;
 }

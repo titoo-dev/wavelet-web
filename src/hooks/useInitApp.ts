@@ -9,7 +9,7 @@ import { useShareStore } from "@/stores/useShareStore";
 export function useInitApp() {
 	const [initialized, setInitialized] = useState(false);
 	const setDeezerAvailable = useAppStore((s) => s.setDeezerAvailable);
-	const { setUser, setDeezerUser, setChilds, setLoading } = useAuthStore();
+	const { setUser, setDeezerUser, setLoading } = useAuthStore();
 
 	useEffect(() => {
 		if (initialized) return;
@@ -41,5 +41,6 @@ export function useInitApp() {
 		}
 
 		init();
-	}, [initialized]);
+		// The setters are store actions: stable for the app's lifetime.
+	}, [initialized, setDeezerAvailable, setUser, setDeezerUser, setLoading]);
 }

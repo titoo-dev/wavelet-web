@@ -34,7 +34,7 @@ describe("GET /api/v1/preferences", () => {
 		prismaMock.userPreferences.findUnique.mockResolvedValue({
 			userId: "u1",
 			preferences: { playlistSortOrder: "asc", preCacheSaved: true },
-		} as any);
+		});
 
 		const res = await GET(makeNextRequest());
 		expect(res.status).toBe(200);
@@ -65,7 +65,7 @@ describe("GET /api/v1/preferences", () => {
 		prismaMock.userPreferences.findUnique.mockResolvedValue({
 			userId: "u1",
 			preferences: null,
-		} as any);
+		});
 
 		const res = await GET(makeNextRequest());
 		expect(res.status).toBe(200);
@@ -126,14 +126,14 @@ describe("PATCH /api/v1/preferences", () => {
 		prismaMock.userPreferences.findUnique.mockResolvedValue({
 			userId: "u1",
 			preferences: { playlistSortOrder: "asc", preCacheSaved: false },
-		} as any);
+		});
 		prismaMock.userPreferences.upsert.mockResolvedValue({
 			userId: "u1",
 			preferences: {
 				playlistSortOrder: "desc",
 				preCacheSaved: false,
 			},
-		} as any);
+		});
 
 		const res = await PATCH(
 			makeNextRequest({
@@ -169,7 +169,7 @@ describe("PATCH /api/v1/preferences", () => {
 		prismaMock.userPreferences.upsert.mockResolvedValue({
 			userId: "u1",
 			preferences: { albumSortOrder: "desc" },
-		} as any);
+		});
 
 		await PATCH(
 			makeNextRequest({
@@ -198,7 +198,7 @@ describe("PATCH /api/v1/preferences", () => {
 				albumSortOrder: "asc",
 				preCacheSaved: true,
 			},
-		} as any);
+		});
 
 		const res = await PATCH(
 			makeNextRequest({

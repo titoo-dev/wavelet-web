@@ -109,8 +109,8 @@ export default function LoginPage() {
 				// A cancelled or failed Google round trip comes back here (with `?error=`), not to Better Auth's error page.
 				errorCallbackURL: loginHref(readNext()),
 			});
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const data = result as any;
+			// The redirect answer of better-auth's social sign-in (the fetch wrapper's or the plain one).
+			const data = result as { error?: { message?: string }; url?: string; data?: { url?: string } } | null;
 			if (data?.error) {
 				setError(data.error.message || "Sign in failed. Please try again.");
 				setLoading(false);

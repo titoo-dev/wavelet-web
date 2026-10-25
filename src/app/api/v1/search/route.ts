@@ -1,8 +1,9 @@
 import { NextRequest } from "next/server";
 import { clean_search_query } from "@/lib/deezer/utils";
 import { ok, fail, handleError, getGuestOrUserDz } from "../_lib/helpers";
+import type { API } from "@/lib/deezer";
 
-const searchMethods: Record<string, string> = {
+const searchMethods: Record<string, "search_track" | "search_album" | "search_artist" | "search_playlist"> = {
 	track: "search_track",
 	album: "search_album",
 	artist: "search_artist",
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
 			return fail("INVALID_TYPE", `Type must be one of: ${Object.keys(searchMethods).join(", ")}`, 400);
 		}
 
-		const results = await (dz.api as any)[method](term, {
+		const results = await (dz.api as API)[method](term, {
 			index: start,
 			limit: nb,
 		});

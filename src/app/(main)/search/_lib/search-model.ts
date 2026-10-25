@@ -4,8 +4,7 @@
  * every branch is unit-tested in `search-model.test.ts`.
  */
 import { rgbToOklch, type CoverSeed } from "@/lib/cover-palette";
-
-/* eslint-disable @typescript-eslint/no-explicit-any -- raw Deezer GW/API payloads */
+import type { GwResults } from "@/lib/deezer/gw";
 
 export type SearchTab = "all" | "track" | "album" | "artist" | "playlist";
 
@@ -109,7 +108,7 @@ export interface AlbumCard {
 	year: string | null;
 }
 
-export function albumProps(a: any): AlbumCard {
+export function albumProps(a: GwResults): AlbumCard {
 	const date: string | undefined = a.PHYSICAL_RELEASE_DATE || a.ORIGINAL_RELEASE_DATE || a.release_date;
 	return {
 		id: String(a.ALB_ID ?? a.id),
@@ -128,7 +127,7 @@ export interface ArtistCard {
 	fans: number | null;
 }
 
-export function artistProps(a: any): ArtistCard {
+export function artistProps(a: GwResults): ArtistCard {
 	const fans = a.NB_FAN ?? a.nb_fan;
 	return {
 		id: String(a.ART_ID ?? a.id),
@@ -146,7 +145,7 @@ export interface PlaylistCard {
 	creator: string | null;
 }
 
-export function playlistProps(p: any): PlaylistCard {
+export function playlistProps(p: GwResults): PlaylistCard {
 	const n = p.NB_SONG ?? p.nb_tracks;
 	return {
 		id: String(p.PLAYLIST_ID ?? p.id),
@@ -162,7 +161,7 @@ export const artistSubtitle = (a: ArtistCard) => (a.fans != null ? `${formatComp
 export const playlistSubtitle = (p: PlaylistCard) => (p.nbTracks != null ? plural(p.nbTracks, "track") : (p.creator ?? undefined));
 
 /** A bigger Deezer track cover than the 56px one `trackFromDeezerRaw` keeps. */
-export function trackCover(raw: any, size = 500): string | null {
+export function trackCover(raw: GwResults, size = 500): string | null {
 	return raw?.album?.cover_xl || raw?.album?.cover_big || cdn("cover", raw?.ALB_PICTURE, size);
 }
 
@@ -175,7 +174,7 @@ export interface MainTotals {
 	playlist: number | null;
 }
 
-export function mainTotals(main: any): MainTotals {
+export function mainTotals(main: GwResults): MainTotals {
 	const t = (k: string) => {
 		const g = main?.[k];
 		if (!g) return null;
@@ -185,18 +184,18 @@ export function mainTotals(main: any): MainTotals {
 	return { track: t("TRACK"), album: t("ALBUM"), artist: t("ARTIST"), playlist: t("PLAYLIST") };
 }
 
-export function isMainEmpty(main: any): boolean {
+export function isMainEmpty(main: GwResults): boolean {
 	return !["TRACK", "ALBUM", "ARTIST", "PLAYLIST"].some((k) => (main?.[k]?.data?.length ?? 0) > 0);
 }
 
-export type TopPick = { kind: "artist"; raw: any } | { kind: "track"; raw: any } | { kind: "album"; raw: any } | null;
+export type TopPick = { kind: "artist"; raw: GwResults } | { kind: "track"; raw: GwResults } | { kind: "album"; raw: GwResults } | null;
 
 /**
  * The hero "Top result": Deezer’s own pick when it is an artist, track or
  * album; else an artist whose name is the query, else the first track, else
  * the first album (the mobile rule).
  */
-export function pickTopResult(main: any, term: string): TopPick {
+export function pickTopResult(main: GwResults, term: string): TopPick {
 	const top = Array.isArray(main?.TOP_RESULT) ? main.TOP_RESULT[0] : null;
 	const kind = top?.__TYPE__;
 	if (kind === "artist" || kind === "track" || kind === "album") return { kind, raw: top };

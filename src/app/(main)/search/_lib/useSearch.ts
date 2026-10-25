@@ -3,16 +3,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchData } from "@/utils/api";
 import { hasMorePages, type SearchTab } from "./search-model";
-
-/* eslint-disable @typescript-eslint/no-explicit-any -- raw Deezer GW/API payloads */
+import type { GwResults } from "@/lib/deezer/gw";
 
 const PAGE = 100;
 /** Overviews by term, so going back to a search is instant. */
-const mainCache = new Map<string, any>();
+const mainCache = new Map<string, GwResults>();
 
 /** `search/main` overview for [term]: drives "All" and the pill counts. */
 export function useMainSearch(term: string) {
-	const [state, setState] = useState<{ term: string; data: any; error: string | null } | null>(null);
+	const [state, setState] = useState<{ term: string; data: GwResults; error: string | null } | null>(null);
 	const [nonce, setNonce] = useState(0);
 
 	useEffect(() => {
@@ -44,7 +43,7 @@ export function useMainSearch(term: string) {
 }
 
 interface Page {
-	data: any[];
+	data: GwResults[];
 	total?: number;
 }
 

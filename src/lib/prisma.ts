@@ -5,7 +5,7 @@ import { Pool } from "pg";
 import { withExplicitSslMode } from "@/lib/db-url";
 
 const globalForPrisma = globalThis as unknown as {
-	prisma: any;
+	prisma: PrismaClient | undefined;
 };
 
 function createPrismaClient() {

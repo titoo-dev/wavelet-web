@@ -1,10 +1,12 @@
 import { decode } from "html-entities";
+import type { GWLyrics } from "@/lib/deezer/gw";
 
 export class Lyrics {
 	id: string;
 	sync: string;
 	unsync: string;
-	syncID3: any[];
+	/** [line, start in ms] pairs for the ID3 SYLT frame. */
+	syncID3: [string, number][];
 
 	constructor(lyr_id = "0") {
 		this.id = lyr_id;
@@ -13,7 +15,7 @@ export class Lyrics {
 		this.syncID3 = [];
 	}
 
-	parseLyrics(lyricsAPI) {
+	parseLyrics(lyricsAPI: GWLyrics) {
 		if (!lyricsAPI || typeof lyricsAPI !== "object") return;
 		this.unsync = lyricsAPI.LYRICS_TEXT || "";
 		if (lyricsAPI.LYRICS_SYNC_JSON) {

@@ -1,5 +1,5 @@
 import { type EnrichedAPIContributor, type EnrichedAPITrack } from "./types";
-import { type GWTrack } from "./gw";
+import { type GWTrack, type GwFilesize, type GwResults } from "./gw";
 
 // Explicit Content Lyrics
 export const LyricsStatus = {
@@ -27,7 +27,7 @@ export function is_explicit(explicit_content_lyrics) {
 
 // maps gw-light api user/tracks to standard api
 export function map_user_track(track) {
-	const result: Record<string, any> = {
+	const result: Record<string, GwResults> = {
 		id: track.SNG_ID,
 		title: track.SNG_TITLE,
 		link: "https://www.deezer.com/track/" + track.SNG_ID,
@@ -231,7 +231,7 @@ export function map_user_playlist(playlist, default_user_name = "") {
 
 // maps gw-light api albums to standard api
 export function map_album(album) {
-	const result: Record<string, any> = {
+	const result: Record<string, GwResults> = {
 		id: album.ALB_ID,
 		title: album.ALB_TITLE,
 		title_short: album.ALB_TITLE,
@@ -530,7 +530,7 @@ export function mapGwTrackToDeezer(track: GWTrack): EnrichedAPITrack {
 		additionalFields.alternative_albums = track.ALBUM_FALLBACK;
 	}
 
-	const filesizes: Record<string, number | undefined> = {
+	const filesizes: Record<string, GwFilesize | undefined> = {
 		...baseResult.filesizes,
 		aac_64: track.FILESIZE_AAC_64,
 		mp3_64: track.FILESIZE_MP3_64,

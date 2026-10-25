@@ -25,6 +25,7 @@ const { DeezerCtor, instances, loginResults } = vi.hoisted(() => {
 vi.mock("@/lib/deezer", () => ({ Deezer: DeezerCtor }));
 
 import { getGuestDz, getOrLoginUserDz, getUserDz, removeUserDz, setUserDz, GUEST_SESSION_TTL_MS } from "./server-state";
+import type { Deezer } from "@/lib/deezer";
 
 const g = globalThis as unknown as Record<string, unknown>;
 
@@ -90,7 +91,7 @@ describe("getGuestDz", () => {
 
 describe("getOrLoginUserDz", () => {
 	it("returns the cached session without touching the database", async () => {
-		const dz = { loggedIn: true };
+		const dz = { loggedIn: true } as unknown as Deezer;
 		setUserDz("u1", dz);
 		await expect(getOrLoginUserDz("u1")).resolves.toBe(dz);
 		expect(prismaMock.deezerCredential.findUnique).not.toHaveBeenCalled();

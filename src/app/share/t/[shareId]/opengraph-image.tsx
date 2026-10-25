@@ -129,9 +129,11 @@ export default async function OgImage({
 									display: "flex",
 								}}
 							/>
-							{/* Image */}
+							{/* Image (ImageResponse renders plain <img>: next/image has no place here) */}
+							{/* eslint-disable-next-line @next/next/no-img-element */}
 							<img
 								src={coverHiRes}
+								alt=""
 								width={380}
 								height={380}
 								style={{
@@ -187,6 +189,7 @@ export default async function OgImage({
 								marginBottom: 16,
 							}}
 						>
+							{/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse renders plain <img> */}
 							<img src={LOGO_DATA_URI} width={44} height={44} alt="" />
 							<span
 								style={{
