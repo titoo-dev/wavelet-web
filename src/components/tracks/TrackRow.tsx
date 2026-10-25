@@ -17,6 +17,7 @@ import { usePreviewStore } from "@/stores/usePreviewStore";
 import { usePlayerStore, type PlayerTrack } from "@/stores/usePlayerStore";
 import { convertDuration } from "@/utils/helpers";
 import { getBitrateBadge } from "@/utils/track-format";
+import type { GwResults } from "@/lib/deezer/gw";
 import { AlbumLink, ArtistLink } from "@/components/links/EntityLink";
 
 export interface TrackRowTrack {
@@ -82,7 +83,7 @@ const GRID: Record<string, string> = {
  * used by this component. Handles both the GW (SNG_ID, ART_NAME, ALB_PICTURE)
  * and public API (id, artist.name, album.cover_small) variants.
  */
-export function trackFromDeezerRaw(raw: any): TrackRowTrack {
+export function trackFromDeezerRaw(raw: GwResults): TrackRowTrack {
 	const id = raw.SNG_ID || raw.id;
 	const cover =
 		raw.album?.cover_small ||
