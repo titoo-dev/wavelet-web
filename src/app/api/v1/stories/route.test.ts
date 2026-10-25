@@ -128,7 +128,7 @@ describe("POST /api/v1/stories", () => {
 		["an unknown theme", { ...valid, theme: "neon" }, "INVALID_THEME"],
 		["no title", { ...valid, title: "" }, "MISSING_METADATA"],
 		["an excerpt under 5 s", { ...valid, lines: [valid.lines[0]], nextLineMs: 62_000 }, "INVALID_RANGE"],
-		["an excerpt over 30 s", { ...valid, nextLineMs: 99_000 }, "INVALID_RANGE"],
+		["an excerpt over 60 s", { ...valid, nextLineMs: 125_000 }, "INVALID_RANGE"],
 	])("answers 400 to %s", async (_n, body, code) => {
 		setSessionUser("u1");
 		const res = await post(body);

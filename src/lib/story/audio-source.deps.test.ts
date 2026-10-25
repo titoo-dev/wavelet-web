@@ -24,7 +24,7 @@ import { defaultAudioSourceDeps as deps } from "./audio-source";
 beforeEach(() => Object.values(m).forEach((f) => f.mockClear()));
 
 describe("findCopy", () => {
-	it("uses a hit, and an under-quality copy too (fine for 30 s), with its size", async () => {
+	it("uses a hit, and an under-quality copy too (fine for an excerpt), with its size", async () => {
 		m.findCachedCopy.mockResolvedValueOnce({ kind: "hit", row: { storagePath: "tracks/1/3.mp3", fileSize: 9 }, stale: [] });
 		expect(await deps.findCopy("u1", "1")).toEqual({ storagePath: "tracks/1/3.mp3", fileSize: 9 });
 		m.findCachedCopy.mockResolvedValueOnce({ kind: "upgrade", best: { storagePath: "tracks/1/1.mp3" }, stale: [] });

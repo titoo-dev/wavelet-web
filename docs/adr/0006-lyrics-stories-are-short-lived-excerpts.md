@@ -2,11 +2,11 @@
 status: proposed
 ---
 
-# Lyrics Stories are short-lived 30-second excerpts for signed-in users
+# Lyrics Stories are short-lived excerpts of at most 60 seconds, for signed-in users
 
 A Lyrics Story puts real Deezer audio into a file the listener posts in public. That is redistribution, and the networks may mute it or take it down. We accept that risk for personal use, behind guardrails the code has to hold:
 
-- at most 30 s of audio;
+- at most 60 s of audio. It was 30 s at first and was raised on 2026-10-25: a chorus often runs 40–60 s, and Instagram, Facebook and WhatsApp take 60 s per story;
 - signed-in users only, at most 20 Story Renders a day and one at a time;
 - the MP4 is deleted from R2 24 hours after it is ready;
 - no history, no public page and no share link inside the video.

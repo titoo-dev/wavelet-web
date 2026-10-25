@@ -596,7 +596,7 @@ const schemas = {
 			title: str(),
 			artist: str(),
 			coverUrl: nstr({ description: "https Deezer artwork (*.dzcdn.net, api.deezer.com); any other URL is ignored and the theme is drawn without a cover" }),
-			lines: arr(ref("StoryLine"), { minItems: 1, maxItems: 30, description: "The Lyrics Range: consecutive synced lines, times non-decreasing, at least one with text" }),
+			lines: arr(ref("StoryLine"), { minItems: 1, maxItems: 60, description: "The Lyrics Range: consecutive synced lines, times non-decreasing, at least one with text" }),
 			nextLineMs: nint({ description: "Start of the line after the last one, ms; null when the last one ends the song" }),
 			trackDurationMs: int({ minimum: 1, description: "Track length, ms" }),
 		},
@@ -1500,7 +1500,7 @@ const paths = {
 			tags: ["Stories"],
 			operationId: "createStoryRender",
 			summary: "Render a Lyrics Story (MP4) of a Lyrics Range",
-			description: "Same range rules as the Theme Stills. **202** with a new `queued` render: it is drawn after the response (about 15–45 s for 30 s of video); follow it with `GET /api/v1/stories/{renderId}`. **200** with the same request's render (same track, range, lines and theme) when it is queued, rendering or ready less than 24 h ago. **409** `RENDER_IN_PROGRESS` while another of your renders runs (its id in `X-Story-Render-Id`). **429** `DAILY_LIMIT` after 20 renders in 24 h (failed ones not counted). The audio comes from the cached copy, else your Deezer session.",
+			description: "Same range rules as the Theme Stills. **202** with a new `queued` render: it is drawn after the response (about 15–90 s, depending on the excerpt length (up to 60 s)); follow it with `GET /api/v1/stories/{renderId}`. **200** with the same request's render (same track, range, lines and theme) when it is queued, rendering or ready less than 24 h ago. **409** `RENDER_IN_PROGRESS` while another of your renders runs (its id in `X-Story-Render-Id`). **429** `DAILY_LIMIT` after 20 renders in 24 h (failed ones not counted). The audio comes from the cached copy, else your Deezer session.",
 			security: userAuth,
 			requestBody: body(ref("CreateStoryInput")),
 			responses: {
@@ -1530,7 +1530,7 @@ const paths = {
 			tags: ["Stories"],
 			operationId: "renderThemeStill",
 			summary: "Theme Still of a Lyrics Range (JPEG)",
-			description: "One 720×1280 frame of the Lyrics Story the range would make in `theme`, drawn by the same code as the video: halfway through the first line. The excerpt runs from 0.3 s before the first line to `nextLineMs` (or 4 s after the last line when `nextLineMs` is null), capped at the track's end, and must last 5 to 30 s (else 400 INVALID_RANGE). Limited to 60 per minute per user (per server instance): over it → 429 `RATE_LIMITED` + `Retry-After`. Response `Cache-Control: private, max-age=3600`.",
+			description: "One 720×1280 frame of the Lyrics Story the range would make in `theme`, drawn by the same code as the video: halfway through the first line. The excerpt runs from 0.3 s before the first line to `nextLineMs` (or 4 s after the last line when `nextLineMs` is null), capped at the track's end, and must last 5 to 60 s (else 400 INVALID_RANGE). Limited to 60 per minute per user (per server instance): over it → 429 `RATE_LIMITED` + `Retry-After`. Response `Cache-Control: private, max-age=3600`.",
 			security: userAuth,
 			requestBody: body(ref("ThemeStillInput")),
 			responses: {

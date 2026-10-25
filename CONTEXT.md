@@ -54,7 +54,7 @@ The public player behind a share link. Its listener may be signed out, so it is 
 ### Lyrics Stories
 
 **Lyrics Range**:
-A run of consecutive synced lyric lines of one track, picked by a listener, lasting 5 to 30 seconds. It is chosen by whole lines, never by free timestamps; a track without synced lyrics has no **Lyrics Range**.
+A run of consecutive synced lyric lines of one track, picked by a listener, lasting 5 to 60 seconds. It is chosen by whole lines, never by free timestamps; a track without synced lyrics has no **Lyrics Range**.
 _Avoid_: Selection, snippet, extract, clip
 
 **Lyrics Story**:

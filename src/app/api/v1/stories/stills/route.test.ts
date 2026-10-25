@@ -71,7 +71,7 @@ describe("POST /api/v1/stories/stills", () => {
 		["no theme", { ...valid, theme: undefined }, "INVALID_THEME"],
 		["a blank title", { ...valid, title: "  " }, "MISSING_METADATA"],
 		["no artist", { ...valid, artist: undefined }, "MISSING_METADATA"],
-		["an excerpt over 30 s", { ...valid, nextLineMs: 95_000 }, "INVALID_RANGE"],
+		["an excerpt over 60 s", { ...valid, nextLineMs: 125_000 }, "INVALID_RANGE"],
 		["lines going backwards", { ...valid, lines: [...valid.lines].reverse() }, "INVALID_RANGE"],
 	])("answers 400 to %s", async (_name, body, code) => {
 		setSessionUser("u1");

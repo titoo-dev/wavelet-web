@@ -43,7 +43,7 @@ async function main() {
 	if (!lyrics.syncedLyrics) throw new Error(`no synced lyrics for ${artist} — ${title}`);
 	const all = parseLrc(lyrics.syncedLyrics).map((l) => ({ timeMs: Math.round(l.time * 1000), text: l.text }));
 
-	// Lines from a third into the song, as many as fit in 30 s.
+	// Lines from a third into the song, as many as fit in MAX_RANGE_MS.
 	const from = all.findIndex((l) => l.timeMs > durationMs / 3);
 	let to = from;
 	while (to + 1 < all.length && (all[to + 2]?.timeMs ?? durationMs) - all[from].timeMs + 300 <= MAX_RANGE_MS) to++;
