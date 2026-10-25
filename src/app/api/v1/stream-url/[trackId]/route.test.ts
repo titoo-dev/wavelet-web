@@ -63,7 +63,7 @@ describe("GET /api/v1/stream-url/[trackId]", () => {
 			bitrate: 320,
 			storagePath: "wavelet-music/foo.mp3",
 			storageType: "s3",
-		}] as any);
+		}]);
 
 		const res = await GET(makeNextRequest(), makeParams({ trackId: "1" }));
 		expect(res.status).toBe(200);
@@ -81,11 +81,11 @@ describe("GET /api/v1/stream-url/[trackId]", () => {
 			bitrate: 320,
 			storagePath: "music/foo.mp3",
 			storageType: "r2",
-		}] as any);
+		}]);
 		getPresignedUrlMock.mockResolvedValue({
 			url: "https://example.com/foo.mp3?sig=abc",
 			contentType: "audio/mpeg",
-		} as any);
+		});
 
 		const res = await GET(makeNextRequest(), makeParams({ trackId: "1" }));
 		expect(res.status).toBe(200);
@@ -146,7 +146,7 @@ describe("GET /api/v1/stream-url/[trackId]", () => {
 			bitrate: 320,
 			storagePath: "music/foo.mp3",
 			storageType: "r2",
-		}] as any);
+		}]);
 		getPresignedUrlMock.mockRejectedValue(new StorageNotFoundError("music/foo.mp3"));
 
 		const res = await GET(makeNextRequest(), makeParams({ trackId: "1" }));
@@ -164,7 +164,7 @@ describe("GET /api/v1/stream-url/[trackId]", () => {
 			bitrate: 320,
 			storagePath: "music/foo.mp3",
 			storageType: "r2",
-		}] as any);
+		}]);
 		getPresignedUrlMock.mockRejectedValue(new Error("No token found"));
 
 		const res = await GET(makeNextRequest(), makeParams({ trackId: "1" }));

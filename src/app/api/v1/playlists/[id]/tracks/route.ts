@@ -3,6 +3,17 @@ import { prisma } from "@/lib/prisma";
 import { ok, fail, handleError, requireUser } from "../../../_lib/helpers";
 import { addToPlaylist, removeFromPlaylist, reorderPlaylist } from "@/lib/library";
 
+/** One posted track, as the client sends it. */
+interface PlaylistTrackInput {
+	trackId: string | number;
+	title?: string;
+	artist?: string;
+	album?: string | null;
+	albumId?: string | null;
+	coverUrl?: string | null;
+	duration?: number | null;
+}
+
 // POST /api/v1/playlists/[id]/tracks — add track(s) to playlist
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
 	try {
@@ -20,7 +31,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 
 		const result = await addToPlaylist(
 			id,
-			tracks.map((t: any) => ({
+			tracks.map((t: PlaylistTrackInput) => ({
 				trackId: String(t.trackId),
 				title: String(t.title || ""),
 				artist: String(t.artist || ""),

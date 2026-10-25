@@ -48,7 +48,7 @@ describe("PATCH /api/v1/playlists/[id]/tracks", () => {
 
 	it("returns 400 when trackIds is missing or not an array", async () => {
 		setSessionUser("u1");
-		prismaMock.playlist.findFirst.mockResolvedValue({ id: "pl1" } as any);
+		prismaMock.playlist.findFirst.mockResolvedValue({ id: "pl1" });
 
 		const res = await PATCH(
 			makeNextRequest({ method: "PATCH", body: { trackIds: "not-an-array" } }),
@@ -61,7 +61,7 @@ describe("PATCH /api/v1/playlists/[id]/tracks", () => {
 
 	it("happy path: forwards stringified trackIds to reorderPlaylist and returns its result", async () => {
 		setSessionUser("u1");
-		prismaMock.playlist.findFirst.mockResolvedValue({ id: "pl1" } as any);
+		prismaMock.playlist.findFirst.mockResolvedValue({ id: "pl1" });
 		reorderPlaylistMock.mockResolvedValue({ reordered: 3 });
 
 		const res = await PATCH(
@@ -79,7 +79,7 @@ describe("PATCH /api/v1/playlists/[id]/tracks", () => {
 
 	it("coerces non-string trackIds to strings before forwarding", async () => {
 		setSessionUser("u1");
-		prismaMock.playlist.findFirst.mockResolvedValue({ id: "pl1" } as any);
+		prismaMock.playlist.findFirst.mockResolvedValue({ id: "pl1" });
 		reorderPlaylistMock.mockResolvedValue({ reordered: 2 });
 
 		await PATCH(
@@ -94,7 +94,7 @@ describe("PATCH /api/v1/playlists/[id]/tracks", () => {
 
 	it("maps REORDER_LENGTH_MISMATCH from the lib to a 400 with the same code", async () => {
 		setSessionUser("u1");
-		prismaMock.playlist.findFirst.mockResolvedValue({ id: "pl1" } as any);
+		prismaMock.playlist.findFirst.mockResolvedValue({ id: "pl1" });
 		reorderPlaylistMock.mockRejectedValue(new Error("REORDER_LENGTH_MISMATCH"));
 
 		const res = await PATCH(
@@ -108,7 +108,7 @@ describe("PATCH /api/v1/playlists/[id]/tracks", () => {
 
 	it("maps REORDER_DUPLICATE_TRACK to a 400 with the same code", async () => {
 		setSessionUser("u1");
-		prismaMock.playlist.findFirst.mockResolvedValue({ id: "pl1" } as any);
+		prismaMock.playlist.findFirst.mockResolvedValue({ id: "pl1" });
 		reorderPlaylistMock.mockRejectedValue(new Error("REORDER_DUPLICATE_TRACK"));
 
 		const res = await PATCH(
@@ -122,7 +122,7 @@ describe("PATCH /api/v1/playlists/[id]/tracks", () => {
 
 	it("maps REORDER_UNKNOWN_TRACK to a 400 with the same code", async () => {
 		setSessionUser("u1");
-		prismaMock.playlist.findFirst.mockResolvedValue({ id: "pl1" } as any);
+		prismaMock.playlist.findFirst.mockResolvedValue({ id: "pl1" });
 		reorderPlaylistMock.mockRejectedValue(new Error("REORDER_UNKNOWN_TRACK"));
 
 		const res = await PATCH(
@@ -136,7 +136,7 @@ describe("PATCH /api/v1/playlists/[id]/tracks", () => {
 
 	it("returns 500 on any other thrown error", async () => {
 		setSessionUser("u1");
-		prismaMock.playlist.findFirst.mockResolvedValue({ id: "pl1" } as any);
+		prismaMock.playlist.findFirst.mockResolvedValue({ id: "pl1" });
 		reorderPlaylistMock.mockRejectedValue(new Error("ECONNREFUSED"));
 
 		const res = await PATCH(

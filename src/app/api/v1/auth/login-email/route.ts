@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
 
 		// Try to extract ARL from the Deezer cookie jar for persistence
 		const arl = dz.cookieJar?.getCookiesSync?.("https://www.deezer.com")
-			?.find((c: any) => c.key === "arl")?.value;
+			?.find((c) => c.key === "arl")?.value;
 
 		if (arl) {
 			await saveDeezerCredential(userResult.userId, arl, dz);

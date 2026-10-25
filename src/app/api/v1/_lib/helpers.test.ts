@@ -169,7 +169,7 @@ describe("requireUser()", () => {
 
 	it("returns 401 NOT_AUTHENTICATED when session has no user.id", async () => {
 		// Session present but missing user.id
-		authMock.api.getSession.mockResolvedValueOnce({} as any);
+		authMock.api.getSession.mockResolvedValueOnce({} as never);
 		const result = await requireUser(makeNextRequest());
 		expect(result.error).toBeTruthy();
 		expect(result.error!.status).toBe(401);
@@ -271,7 +271,7 @@ describe("requireDeezer()", () => {
 		prismaMock.deezerCredential.findUnique.mockResolvedValue({
 			userId: "u1",
 			arl: "stored-arl",
-		} as any);
+		});
 
 		const result = await requireDeezer(makeNextRequest());
 
@@ -414,7 +414,7 @@ describe("requireDeezer()", () => {
 		prismaMock.deezerCredential.findUnique.mockResolvedValue({
 			userId: "u1",
 			arl: "stored-arl",
-		} as any);
+		});
 
 		const result = await requireDeezer(makeNextRequest());
 		expect(result.error).toBeNull();
@@ -441,7 +441,7 @@ describe("requireDeezer()", () => {
 		prismaMock.deezerCredential.findUnique.mockResolvedValue({
 			userId: "u1",
 			arl: "bad-arl",
-		} as any);
+		});
 		deezerLoginBehavior.next = "fail";
 
 		const result = await requireDeezer(makeNextRequest());
@@ -472,7 +472,7 @@ describe("requireDeezer()", () => {
 		prismaMock.deezerCredential.findUnique.mockResolvedValue({
 			userId: "u1",
 			arl: "boom",
-		} as any);
+		});
 		deezerLoginBehavior.next = "throw";
 
 		const result = await requireDeezer(makeNextRequest());
@@ -619,7 +619,7 @@ describe("getGuestOrUserDz()", () => {
 		prismaMock.deezerCredential.findUnique.mockResolvedValue({
 			userId: "u1",
 			arl: "stored-arl",
-		} as any);
+		});
 
 		const result = await getGuestOrUserDz(makeNextRequest());
 		expect(result.userId).toBe("u1");
@@ -651,7 +651,7 @@ describe("getGuestOrUserDz()", () => {
 		prismaMock.deezerCredential.findUnique.mockResolvedValue({
 			userId: "u1",
 			arl: "bad-arl",
-		} as any);
+		});
 		deezerLoginBehavior.next = "fail";
 		const guestDz = { id: "guest" };
 		serverStateMock.getGuestDz.mockResolvedValue(guestDz);

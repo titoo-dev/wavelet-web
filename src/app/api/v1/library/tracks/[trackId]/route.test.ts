@@ -64,7 +64,7 @@ describe("DELETE /api/v1/library/tracks/[trackId]", () => {
 
 	it("calls unsaveTrack with userId + trackId and returns { unsaved: true }", async () => {
 		setSessionUser("u1");
-		unsaveTrackMock.mockResolvedValue(undefined as any);
+		unsaveTrackMock.mockResolvedValue(undefined);
 
 		const res = await DELETE(
 			makeNextRequest({ method: "DELETE" }),

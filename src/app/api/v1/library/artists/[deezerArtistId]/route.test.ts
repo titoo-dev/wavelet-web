@@ -32,7 +32,7 @@ describe("DELETE /api/v1/library/artists/[deezerArtistId]", () => {
 
 	it("forwards the upstream Deezer id to unfollowArtist and returns 200 with unfollowed: true", async () => {
 		setSessionUser("u1");
-		unfollowArtistMock.mockResolvedValue(undefined as any);
+		unfollowArtistMock.mockResolvedValue(undefined);
 
 		const res = await DELETE(
 			makeNextRequest({ method: "DELETE" }),
@@ -46,7 +46,7 @@ describe("DELETE /api/v1/library/artists/[deezerArtistId]", () => {
 
 	it("is idempotent — returns 200 even when the user wasn't following the artist", async () => {
 		setSessionUser("u1");
-		unfollowArtistMock.mockResolvedValue(undefined as any);
+		unfollowArtistMock.mockResolvedValue(undefined);
 
 		const res = await DELETE(
 			makeNextRequest({ method: "DELETE" }),
