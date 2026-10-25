@@ -166,7 +166,7 @@ class Track {
 			// Get Lyrics Data
 			// The pageTrack response may include full lyrics; if so, reuse them.
 			// Otherwise, fetch via song.getLyrics (uses track ID).
-			const lyricsData = existingTrack.lyrics as any;
+			const lyricsData = existingTrack.lyrics;
 			const hasFullLyrics =
 				lyricsData != null &&
 				typeof lyricsData === "object" &&
@@ -178,7 +178,7 @@ class Track {
 					// Lyrics not available (region restriction or no lyrics for this track)
 				}
 			}
-			const finalLyrics = existingTrack.lyrics as any;
+			const finalLyrics = existingTrack.lyrics;
 			if (
 				finalLyrics &&
 				typeof finalLyrics === "object" &&

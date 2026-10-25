@@ -11,7 +11,7 @@ import {
 	PermissionException,
 	WrongParameterException,
 } from "./errors";
-import { SearchOrder, type APIAlbum, type APIOptions } from "./index";
+import { SearchOrder, type APIAlbum, type APIOptions, type APIPlaylist } from "./index";
 import { trackSchema, type DeezerTrack } from "./schema/track-schema";
 import { errorSummary } from "@/lib/log-safe";
 import {
@@ -500,10 +500,10 @@ export class API {
 	// Extra calls
 
 	async get_countries_charts() {
-		const temp: any = await this.get_user_playlists("637006841", {
+		const temp = (await this.get_user_playlists("637006841", {
 			index: 0,
 			limit: -1,
-		});
+		})) as { data: APIPlaylist[] };
 		const result = temp.data.sort((a, b) => a.title.localeCompare(b.title)); // Sort all playlists
 		if (!result[0].title.startsWith("Top")) result.shift(); // Remove loved tracks playlist
 		return result;
@@ -514,10 +514,11 @@ export class API {
 		track = track.replace("–", "-").replace("'", "'");
 		album = album.replace("–", "-").replace("'", "'");
 
-		let resp: any = await this.advanced_search({ artist, track, album });
+		type SearchPage = { data: { id: number }[] };
+		let resp = (await this.advanced_search({ artist, track, album })) as SearchPage;
 		if (resp.data.length) return resp.data[0].id;
 
-		resp = await this.advanced_search({ artist, track });
+		resp = (await this.advanced_search({ artist, track })) as SearchPage;
 		if (resp.data.length) return resp.data[0].id;
 
 		// Try removing version
@@ -526,13 +527,13 @@ export class API {
 			track.indexOf(")") !== -1 &&
 			track.indexOf("(") < track.indexOf(")")
 		) {
-			resp = await this.advanced_search({ artist, track: track.split("(")[0] });
+			resp = (await this.advanced_search({ artist, track: track.split("(")[0] })) as SearchPage;
 			if (resp.data.length) return resp.data[0].id;
 		} else if (track.indexOf(" - ") !== -1) {
-			resp = await this.advanced_search({
+			resp = (await this.advanced_search({
 				artist,
 				track: track.split(" - ")[0],
-			});
+			})) as SearchPage;
 			if (resp.data.length) return resp.data[0].id;
 		}
 
