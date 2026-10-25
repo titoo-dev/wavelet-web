@@ -12,12 +12,12 @@ import { SaveButton } from "./SaveButton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { CoverImage } from "@/components/ui/cover-image";
-import { ListEnd, ListPlus, ListStart, Trash2, Disc3, User, ArrowLeft, Plus, Share2, Link as LinkIcon, ChevronRight, Check } from "lucide-react";
+import { ListEnd, ListPlus, ListStart, Trash2, Disc3, User, ArrowLeft, Plus, Share2, Link as LinkIcon, ChevronRight, Check, Radio } from "lucide-react";
 import Link from "next/link";
 import { Equalizer, PlayPauseIcon, Spinner } from "@/components/motion/icons";
 import { Art, CoverTheme, entrance, swap, SPRING } from "@/components/expressive";
 import { cn } from "@/lib/utils";
-import { albumHref, artistHref } from "@/lib/entity-links";
+import { albumHref, artistHref, trackRadioHref } from "@/lib/entity-links";
 import { ArtistLink, useOverlayLink } from "@/components/links/EntityLink";
 import { leavePlayer } from "@/components/audio/leave-player";
 
@@ -349,7 +349,14 @@ export function TrackActionSheet() {
 
 	const albumLink = albumHref(track.albumId, track.albumTitle, track.artist);
 	const artistLink = artistHref(track.artistId, track.artist);
+	const radioLink = isAuthenticated ? trackRadioHref(track.id) : null;
 	const rows: ReactNode[] = [];
+	if (radioLink)
+		rows.push(
+			<Link key="radio" href={radioLink} replace={overlay.replace} onClick={overlay.onClick} className="no-underline">
+				<ActionRow icon={<Radio />} label="Go to song radio" sublabel="Discover songs that sound like it" chevron />
+			</Link>
+		);
 	if (albumLink)
 		rows.push(
 			<Link key="album" href={albumLink} replace={overlay.replace} onClick={overlay.onClick} className="no-underline">

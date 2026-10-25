@@ -2839,6 +2839,86 @@
 				]
 			}
 		},
+		"/api/v1/tracks/{trackId}/radio": {
+			"parameters": [
+				{
+					"name": "trackId",
+					"in": "path",
+					"required": true,
+					"description": "Deezer track id",
+					"schema": {
+						"type": "string"
+					}
+				}
+			],
+			"get": {
+				"tags": [
+					"Listens"
+				],
+				"operationId": "getTrackRadio",
+				"summary": "The track's radio: songs similar to it",
+				"description": "ListenBrainz / Last.fm tracks similar to this one (found back on Deezer) lead, Deezer's radio of its artist fills in. Leaves out the track itself, what this user skips early more often than they listen to it, the artists they skipped early 3 times and never listened to, and anything played in the last 3 hours; at most 2 tracks per artist, never one artist twice in a row when it can be helped. `seed` is the track as Deezer knows it. Play with `source: \"track-radio\"`.",
+				"security": [
+					{
+						"bearerAuth": []
+					},
+					{
+						"sessionCookie": []
+					}
+				],
+				"parameters": [
+					{
+						"name": "limit",
+						"in": "query",
+						"required": false,
+						"description": "Most tracks returned",
+						"schema": {
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 50,
+							"default": 30
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/TrackRadioEnvelope"
+								}
+							}
+						}
+					},
+					"400": {
+						"$ref": "#/components/responses/BadRequest"
+					},
+					"401": {
+						"$ref": "#/components/responses/NotAuthenticated"
+					},
+					"404": {
+						"$ref": "#/components/responses/NotFound"
+					},
+					"500": {
+						"$ref": "#/components/responses/InternalError"
+					},
+					"502": {
+						"$ref": "#/components/responses/DeezerUpstreamError"
+					},
+					"503": {
+						"$ref": "#/components/responses/NoDeezer"
+					}
+				},
+				"x-error-codes": [
+					"INVALID_TRACK_ID",
+					"INVALID_LIMIT",
+					"NOT_FOUND",
+					"UPSTREAM_ERROR",
+					"NO_DEEZER"
+				]
+			}
+		},
 		"/api/v1/mixes/daily": {
 			"get": {
 				"tags": [
@@ -7381,6 +7461,39 @@
 						"required": [
 							"tracks",
 							"seedArtistIds"
+						]
+					}
+				},
+				"required": [
+					"success",
+					"data"
+				]
+			},
+			"TrackRadioEnvelope": {
+				"type": "object",
+				"properties": {
+					"success": {
+						"type": "boolean",
+						"enum": [
+							true
+						]
+					},
+					"data": {
+						"type": "object",
+						"properties": {
+							"seed": {
+								"$ref": "#/components/schemas/AutoplayTrack"
+							},
+							"tracks": {
+								"type": "array",
+								"items": {
+									"$ref": "#/components/schemas/AutoplayTrack"
+								}
+							}
+						},
+						"required": [
+							"seed",
+							"tracks"
 						]
 					}
 				},

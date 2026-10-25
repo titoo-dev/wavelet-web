@@ -55,7 +55,10 @@ export async function GET(request: NextRequest) {
 								data: {
 									userId: session.user.id,
 									arl: encryptSecret(arl),
-									deezerUserId: String(dz.currentUser?.id || ""),
+									// TODO: deezerUserId is a BigInt column; this string is what the
+									// route has always sent (typed now that `prisma` is). Kept as is
+									// in the lint clean-up: see the PR notes.
+									deezerUserId: String(dz.currentUser?.id || "") as unknown as bigint,
 									deezerUserName: dz.currentUser?.name || "",
 									deezerPicture: dz.currentUser?.picture || "",
 									canStreamHq: !!dz.currentUser?.can_stream_hq,

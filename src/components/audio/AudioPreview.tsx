@@ -6,7 +6,7 @@ import { adjustVolume } from "@/utils/adjust-volume";
 
 export function AudioPreview() {
 	const audioRef = useRef<HTMLAudioElement>(null);
-	const { currentTrack, isPlaying, volume, pause, stop, setBuffering } = usePreviewStore();
+	const { currentTrack, isPlaying, volume, stop, setBuffering } = usePreviewStore();
 	const prevTrackIdRef = useRef<string | null>(null);
 
 	// Handle track changes
@@ -50,6 +50,9 @@ export function AudioPreview() {
 				audio.pause();
 			});
 		}
+		// Runs on play / pause only: a track change loads in the effect above (onCanPlay starts
+		// it) and a volume change fades in the one below.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [isPlaying]);
 
 	// Handle volume changes while playing
@@ -57,6 +60,8 @@ export function AudioPreview() {
 		const audio = audioRef.current;
 		if (!audio || !isPlaying) return;
 		adjustVolume(audio, volume / 100, { duration: 200 });
+		// Runs on volume changes only: play / pause sets its own fade.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [volume]);
 
 	const onCanPlay = useCallback(() => {

@@ -27,6 +27,7 @@ import {
 	MoreHorizontal,
 	ChevronRight,
 	Plus,
+	Radio,
 } from "lucide-react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
@@ -34,7 +35,7 @@ import { Button } from "@/components/ui/button";
 import { DrawCheck, HeartGlyph, PlayPauseIcon, Spinner } from "@/components/motion/icons";
 import { CoverImage } from "@/components/ui/cover-image";
 import { cn } from "@/lib/utils";
-import { albumHref, artistHref } from "@/lib/entity-links";
+import { albumHref, artistHref, trackRadioHref } from "@/lib/entity-links";
 import { ArtistLink } from "@/components/links/EntityLink";
 
 /** Menu item shape: rounded-xl rows with a little more air (M3 menus). */
@@ -296,6 +297,7 @@ export function TrackActionMenu({
 	const close = () => changeOpen(false);
 	const albumLink = albumHref(track.albumId, track.albumTitle, track.artist);
 	const artistLink = artistHref(track.artistId, track.artist);
+	const radioLink = isAuthenticated ? trackRadioHref(track.id) : null;
 
 	const toPlayerTrack = useCallback(
 		() => ({
@@ -444,7 +446,16 @@ export function TrackActionMenu({
 								</DropdownMenuItem>
 							)}
 
-							{(albumLink || artistLink) && <DropdownMenuSeparator />}
+							{(radioLink || albumLink || artistLink) && <DropdownMenuSeparator />}
+
+							{radioLink && (
+								<Link href={radioLink} onClick={close} className="no-underline">
+									<DropdownMenuItem className={item}>
+										<Radio className="size-4" />
+										Go to song radio
+									</DropdownMenuItem>
+								</Link>
+							)}
 
 							{albumLink && (
 								<Link href={albumLink} onClick={close} className="no-underline">

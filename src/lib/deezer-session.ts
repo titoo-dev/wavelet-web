@@ -8,10 +8,11 @@
 import { prisma } from "@/lib/prisma";
 import { getUserDz, setUserDz } from "@/lib/server-state";
 import { decryptSecret, encryptSecret, isEncryptedSecret } from "@/lib/secret-box";
+import type { Deezer } from "@/lib/deezer";
 import type { User } from "@/lib/deezer/types";
 
 export type DzRestore =
-	| { status: "ok"; dz: any } // eslint-disable-line @typescript-eslint/no-explicit-any -- the Deezer client is untyped at this seam (see server-state)
+	| { status: "ok"; dz: Deezer }
 	| { status: "no-arl" }
 	| { status: "login-failed" }
 	| { status: "error"; error: unknown };

@@ -11,6 +11,7 @@ vi.mock("@/lib/deezer-session", () => ({ restoreUserDz: vi.fn() }));
 import { GET, POST } from "./route";
 import { shareTrack } from "@/lib/library";
 import { restoreUserDz } from "@/lib/deezer-session";
+import type { Deezer } from "@/lib/deezer";
 
 const shareTrackMock = vi.mocked(shareTrack);
 const restoreMock = vi.mocked(restoreUserDz);
@@ -46,7 +47,7 @@ describe("POST /api/v1/shares — metadata from Deezer", () => {
 	beforeEach(() => {
 		setSessionUser("u1");
 		prismaMock.sharedTrack.findFirst.mockResolvedValue(null);
-		restoreMock.mockResolvedValue({ status: "ok", dz: { api: { getTrack } } });
+		restoreMock.mockResolvedValue({ status: "ok", dz: { api: { getTrack } } as unknown as Deezer });
 	});
 
 	it("publishes Deezer's title, artist, album and cover, not the client's (was: any title could be published for a track)", async () => {

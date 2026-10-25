@@ -34,11 +34,11 @@ describe("GET /api/v1/library/artists", () => {
 		listFollowedArtistsMock.mockResolvedValue([
 			{ id: "f1", deezerArtistId: "27", name: "Daft Punk" },
 			{ id: "f2", deezerArtistId: "55", name: "Aphex Twin" },
-		] as any);
+		] as never);
 
 		const res = await GET(makeNextRequest());
 		expect(res.status).toBe(200);
-		const body = await readJson<{ data: { items: any[] } }>(res);
+		const body = await readJson<{ data: { items: unknown[] } }>(res);
 		expect(body?.data.items).toHaveLength(2);
 		expect(listFollowedArtistsMock).toHaveBeenCalledWith("u1");
 	});
@@ -95,11 +95,11 @@ describe("POST /api/v1/library/artists", () => {
 	it("forwards the upsert call to followArtist and echoes the row", async () => {
 		setSessionUser("u1");
 		const row = { id: "f1", userId: "u1", deezerArtistId: "27" };
-		followArtistMock.mockResolvedValue(row as any);
+		followArtistMock.mockResolvedValue(row as never);
 
 		const res = await POST(makeNextRequest({ method: "POST", body: validBody }));
 		expect(res.status).toBe(200);
-		const body = await readJson<{ data: { followed: any } }>(res);
+		const body = await readJson<{ data: { followed: unknown } }>(res);
 		expect(body?.data.followed).toEqual(row);
 		expect(followArtistMock).toHaveBeenCalledWith("u1", {
 			deezerArtistId: "27",
@@ -110,7 +110,7 @@ describe("POST /api/v1/library/artists", () => {
 
 	it("normalizes a missing pictureUrl to null before calling followArtist", async () => {
 		setSessionUser("u1");
-		followArtistMock.mockResolvedValue({} as any);
+		followArtistMock.mockResolvedValue({} as never);
 
 		await POST(
 			makeNextRequest({

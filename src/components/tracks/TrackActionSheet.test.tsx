@@ -72,6 +72,20 @@ describe("TrackActionSheet", () => {
 		expect(screen.getByRole("link", { name: /Go to album/ })).toHaveAttribute("href", "/album?title=Fitiavana&artist=Hosea%20Marlyn");
 	});
 
+	it("links to the song radio when signed in, not for user uploads or guests", () => {
+		const { unmount } = render(<TrackActionSheet />);
+		expect(screen.getByRole("link", { name: /Go to song radio/ })).toHaveAttribute("href", "/radio?track=1");
+		unmount();
+		useTrackActionStore.setState({ track: { ...info, id: "-5" } });
+		const upload = render(<TrackActionSheet />);
+		expect(screen.queryByRole("link", { name: /Go to song radio/ })).toBeNull();
+		upload.unmount();
+		useTrackActionStore.setState({ track: info });
+		useAuthStore.setState({ isAuthenticated: false });
+		render(<TrackActionSheet />);
+		expect(screen.queryByRole("link", { name: /Go to song radio/ })).toBeNull();
+	});
+
 	it("is not hidden on desktop (was: md:hidden, so right-click on a row did nothing on desktop)", () => {
 		render(<TrackActionSheet />);
 		const popup = document.querySelector("[data-slot=sheet-content]");

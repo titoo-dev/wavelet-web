@@ -1,17 +1,17 @@
 import { removeDuplicateArtists, removeFeatures } from "../utils/core";
-import { type APIAlbum } from "@/lib/deezer";
-import { Artist } from "./Artist";
+import { type APIAlbum, type APIPlaylist } from "@/lib/deezer";
+import { Artist, type ArtistsByRole } from "./Artist";
 import { CustomDate } from "./CustomDate";
-import { Picture } from "./Picture";
+import { Picture, type StaticPicture } from "./Picture";
 import { VARIOUS_ARTISTS } from "./index";
 
 export class Album {
 	id: string;
 	title: string;
 	name?: string;
-	pic: any;
-	artist: { Main: any[] };
-	artists: any[];
+	pic: Picture | StaticPicture;
+	artist: ArtistsByRole;
+	artists: string[];
 	mainArtist: Artist | null;
 	date: CustomDate;
 	dateString: string;
@@ -20,7 +20,7 @@ export class Album {
 	embeddedCoverPath: string;
 	embeddedCoverURL: string;
 	explicit: boolean;
-	genre: any[];
+	genre: string[];
 	barcode: string;
 	label: string;
 	copyright: string;
@@ -29,9 +29,9 @@ export class Album {
 	rootArtist: Artist | null;
 	variousArtists: Artist | null;
 	playlistId: null;
-	owner: null;
+	owner: APIPlaylist["creator"] | null;
 	isPlaylist: boolean;
-	playlistID: any;
+	playlistID: string;
 
 	constructor(alb_id = "0", title = "", pic_md5 = "") {
 		this.id = alb_id;
@@ -127,7 +127,8 @@ export class Album {
 		this.discTotal = albumAPI.nb_disk || 1;
 		this.copyright = albumAPI.copyright || "";
 
-		if (this.pic.md5 === "") {
+		// A playlist compilation's StaticPicture has no md5 (it never matched "").
+		if (this.pic instanceof Picture && this.pic.md5 === "") {
 			if (albumAPI.md5_image) {
 				this.pic.md5 = albumAPI.md5_image;
 			} else if (albumAPI.cover_small) {

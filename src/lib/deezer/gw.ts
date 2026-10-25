@@ -1,4 +1,5 @@
 import got from "got";
+import type { CookieJar } from "tough-cookie";
 import {
 	map_artist_album,
 	map_user_track,
@@ -37,40 +38,81 @@ export const PlaylistStatus = {
 	COLLABORATIVE: 2,
 };
 
+/**
+ * A gw-light `results` payload. Its shape depends on the method and the page
+ * (deezer.pageArtist, song.getListData, …) and nothing validates it: callers
+ * read the fields they need as Deezer sends them. The same raw items reach
+ * the UI (search/main mixes public API items into the gw sections), so the
+ * mappers there take them as this type too.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- schemaless gw-light JSON, see above
+export type GwResults = any;
+
+/** Arguments of a gw-light method (the JSON body). */
+type GwArgs = Record<string, unknown>;
+
+/** One credited artist of a gw track. */
+export interface GWTrackArtist {
+	ART_ID: number;
+	ART_NAME: string;
+	ART_PICTURE: string;
+	ROLE_ID: number;
+	ARTISTS_SONGS_ORDER: string;
+	RANK: number;
+}
+
+/** An album of a track page's ISRC block (other releases of the recording). */
+export interface GWAlbumFallback {
+	ALB_ID: string;
+	RIGHTS: { STREAM_ADS_AVAILABLE?: boolean; STREAM_SUB_AVAILABLE?: boolean };
+}
+
+/** song.getLyrics answer (deezer.pageTrack carries it as LYRICS). */
+export interface GWLyrics {
+	LYRICS_ID?: string;
+	LYRICS_TEXT?: string;
+	LYRICS_SYNC_JSON?: { line: string; lrc_timestamp: string; milliseconds: string; duration?: string }[];
+}
+
+/** A gw file size: a numeric string ("0" when the format is missing) or a number. */
+export type GwFilesize = string | number;
+
 export interface GWTrack {
 	ALB_ID: string;
 	TRACK_TOKEN_EXPIRE: number;
 	TOKEN: string;
-	USER_ID: any;
-	FILESIZE_MP3_MISC: any;
+	USER_ID: string;
+	FILESIZE_MP3_MISC: GwFilesize;
 	VERSION: string;
 	TRACK_NUMBER: number;
 	DISK_NUMBER: number;
-	RANK: any;
-	RANK_SNG: any;
+	RANK: number;
+	RANK_SNG: number;
 	PHYSICAL_RELEASE_DATE: string;
-	EXPLICIT_LYRICS(EXPLICIT_LYRICS: any): boolean;
-	EXPLICIT_TRACK_CONTENT: any;
-	MEDIA: any;
+	EXPLICIT_LYRICS: string | number | boolean;
+	EXPLICIT_TRACK_CONTENT: { EXPLICIT_LYRICS_STATUS: number; EXPLICIT_COVER_STATUS: number };
+	MEDIA: { TYPE?: string; HREF?: string }[];
 	GAIN: number;
-	ARTISTS: any;
-	LYRICS_ID: any;
-	SNG_CONTRIBUTORS: any;
-	FALLBACK: any;
-	DIGITAL_RELEASE_DATE: any;
-	GENRE_ID: any;
-	COPYRIGHT: any;
-	LYRICS: any;
-	ALBUM_FALLBACK: any;
-	FILESIZE_AAC_64: any;
-	FILESIZE_MP3_64: any;
-	FILESIZE_MP3_128: any;
-	FILESIZE_MP3_256: any;
-	FILESIZE_MP3_320: any;
-	FILESIZE_MP4_RA1: any;
-	FILESIZE_MP4_RA2: any;
-	FILESIZE_MP4_RA3: any;
-	FILESIZE_FLAC: any;
+	ARTISTS?: GWTrackArtist[];
+	LYRICS_ID: string;
+	SNG_CONTRIBUTORS: Record<string, string[]>;
+	FALLBACK?: { SNG_ID: number };
+	DIGITAL_RELEASE_DATE?: string;
+	GENRE_ID?: number;
+	COPYRIGHT?: string;
+	LYRICS?: GWLyrics;
+	ALBUM_FALLBACK?: { data: GWAlbumFallback[] };
+	FILESIZE_AAC_64: GwFilesize;
+	FILESIZE_MP3_64: GwFilesize;
+	FILESIZE_MP3_128: GwFilesize;
+	FILESIZE_MP3_256: GwFilesize;
+	FILESIZE_MP3_320: GwFilesize;
+	FILESIZE_MP4_RA1: GwFilesize;
+	FILESIZE_MP4_RA2: GwFilesize;
+	FILESIZE_MP4_RA3: GwFilesize;
+	FILESIZE_FLAC: GwFilesize;
+	/** Index in its album / playlist / top-tracks list (set by those list calls). */
+	POSITION?: number;
 	TRACK_TOKEN: string;
 	SNG_ID: number;
 	SNG_TITLE: string;
@@ -99,11 +141,11 @@ export const EMPTY_TRACK_OBJ = {
 } satisfies Partial<GWTrack>;
 
 export class GW {
-	httpHeaders: any;
-	cookieJar: any;
-	api_token: any;
+	httpHeaders: { "User-Agent": string };
+	cookieJar: CookieJar;
+	api_token: string | null;
 
-	constructor(cookieJar, headers) {
+	constructor(cookieJar: CookieJar, headers: { "User-Agent": string }) {
 		this.httpHeaders = headers;
 		this.cookieJar = cookieJar;
 		this.api_token = null;
@@ -117,10 +159,10 @@ export class GW {
 	 */
 	async api_call(
 		method: string,
-		args?: any,
-		params?: any,
+		args?: GwArgs,
+		params?: Record<string, string>,
 		_state: { tokenRefreshed?: boolean; fallbackDepth?: number } = {}
-	): Promise<any> {
+	): Promise<GwResults> {
 		if (args === undefined) args = {};
 		if (params === undefined) params = {};
 		if (!this.api_token && method !== "deezer.getUserData")
@@ -219,8 +261,8 @@ export class GW {
 		return this.api_call("song.getLyrics", { SNG_ID: sng_id });
 	}
 
-	async get_tracks(sng_ids) {
-		const tracks_array: any[] = [];
+	async get_tracks(sng_ids: (string | number)[]) {
+		const tracks_array: (GWTrack | typeof EMPTY_TRACK_OBJ)[] = [];
 		const body = await this.api_call("song.getListData", { SNG_IDS: sng_ids });
 		let errors = 0;
 		for (let i = 0; i < sng_ids.length; i++) {
@@ -248,7 +290,7 @@ export class GW {
 	}
 
 	async get_album_tracks(alb_id) {
-		const tracks_array: any[] = [];
+		const tracks_array: GWTrack[] = [];
 		const body = await this.api_call("song.getListByAlbum", {
 			ALB_ID: alb_id,
 			nb: -1,
@@ -276,7 +318,7 @@ export class GW {
 
 	async get_artist_top_tracks(art_id, options: APIOptions = {}) {
 		const limit = options.limit || 100;
-		const tracks_array: any[] = [];
+		const tracks_array: GWTrack[] = [];
 		const body = await this.api_call("artist.getTopTrack", {
 			ART_ID: art_id,
 			nb: limit,
@@ -314,7 +356,7 @@ export class GW {
 	}
 
 	async get_playlist_tracks(playlist_id) {
-		const tracks_array: any[] = [];
+		const tracks_array: GWTrack[] = [];
 		const body = await this.api_call("playlist.getSongs", {
 			PLAYLIST_ID: playlist_id,
 			nb: -1,
@@ -332,7 +374,7 @@ export class GW {
 		description,
 		songs = []
 	) {
-		const newSongs: any[] = [];
+		const newSongs: [string | number, number][] = [];
 		songs.forEach((song) => {
 			newSongs.push([song, 0]);
 		});
@@ -345,7 +387,7 @@ export class GW {
 	}
 
 	edit_playlist(playlist_id, title, status, description, songs = []) {
-		const newSongs: any[] = [];
+		const newSongs: [string | number, number][] = [];
 		songs.forEach((song) => {
 			newSongs.push([song, 0]);
 		});
@@ -359,7 +401,7 @@ export class GW {
 	}
 
 	add_songs_to_playlist(playlist_id, songs, offset = -1) {
-		const newSongs: any[] = [];
+		const newSongs: [string | number, number][] = [];
 		songs.forEach((song) => {
 			newSongs.push([song, 0]);
 		});
@@ -375,7 +417,7 @@ export class GW {
 	}
 
 	remove_songs_from_playlist(playlist_id, songs) {
-		const newSongs: any[] = [];
+		const newSongs: [string | number, number][] = [];
 		songs.forEach((song) => {
 			newSongs.push([song, 0]);
 		});
@@ -397,7 +439,7 @@ export class GW {
 		return this.gw_api_call("favorite_song.add", { SNG_ID: sng_id });
 	}
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	gw_api_call(arg0: string, arg1: Record<string, any>) {
+	gw_api_call(arg0: string, arg1: GwArgs): never {
 		throw new Error("Method not implemented.");
 	}
 
@@ -484,8 +526,8 @@ export class GW {
 		const limit = options.limit || 100;
 		let index = 0;
 		let releases = [];
-		const result: any = { all: [], featured: [], more: [] };
-		const ids: any[] = [];
+		const result: Record<string, ReturnType<typeof map_artist_album>[]> = { all: [], featured: [], more: [] };
+		const ids: string[] = [];
 
 		// Get all releases
 		let response;
@@ -495,7 +537,7 @@ export class GW {
 			index += limit;
 		} while (index < response.total);
 
-		releases.forEach((release: any) => {
+		releases.forEach((release: GwResults) => {
 			if (ids.indexOf(release.ALB_ID) === -1) {
 				ids.push(release.ALB_ID);
 				const obj = map_artist_album(release);
@@ -552,7 +594,7 @@ export class GW {
 		);
 		const blog_name = user_profile_page.DATA.USER.BLOG_NAME || "Unknown";
 		const data = user_profile_page.TAB.playlists.data;
-		const result: any[] = [];
+		const result: ReturnType<typeof map_user_playlist>[] = [];
 		data.forEach((playlist) => {
 			result.push(map_user_playlist(playlist, blog_name));
 		});
@@ -563,7 +605,7 @@ export class GW {
 		const limit = options.limit || 25;
 		let data = await this.get_user_profile_page(user_id, "albums", { limit });
 		data = data.TAB.albums.data;
-		const result: any[] = [];
+		const result: ReturnType<typeof map_user_album>[] = [];
 		data.forEach((album) => {
 			result.push(map_user_album(album));
 		});
@@ -574,7 +616,7 @@ export class GW {
 		const limit = options.limit || 25;
 		let data = await this.get_user_profile_page(user_id, "artists", { limit });
 		data = data.TAB.artists.data;
-		const result: any[] = [];
+		const result: ReturnType<typeof map_user_artist>[] = [];
 		data.forEach((artist) => {
 			result.push(map_user_artist(artist));
 		});
@@ -588,7 +630,7 @@ export class GW {
 		const limit = options.limit || 25;
 		let data = await this.get_user_profile_page(user_id, "loved", { limit });
 		data = data.TAB.loved.data;
-		const result: any[] = [];
+		const result: ReturnType<typeof map_user_track>[] = [];
 		data.forEach((track) => {
 			result.push(map_user_track(track));
 		});
@@ -602,7 +644,7 @@ export class GW {
 		const ids = ids_raw.data.map((x) => x.SNG_ID);
 		if (!ids.length) return [];
 		const data = await this.get_tracks(ids);
-		const result: any[] = [];
+		const result: ReturnType<typeof map_user_track>[] = [];
 		let i = 0;
 		data.forEach((track) => {
 			if (!track) return;

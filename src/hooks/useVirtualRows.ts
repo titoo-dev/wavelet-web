@@ -114,6 +114,8 @@ export function useScrollerRows({
 	const scrollEl = list ? scroller(list) : null;
 	const scrollMargin = useScrollMargin(list, scrollEl, false, enabled);
 
+	// TanStack Virtual hands out new functions every render: the compiler skips this hook, which is fine.
+	// eslint-disable-next-line react-hooks/incompatible-library
 	const virtualizer = useVirtualizer<Element, Element>({
 		count,
 		enabled,

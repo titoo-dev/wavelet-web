@@ -436,7 +436,7 @@ export function generatePlaylistName(
 		"%owner%",
 		fixName(playlist.owner.name, c)
 	);
-	foldername = foldername.replaceAll("%owner_id%", playlist.owner.id);
+	foldername = foldername.replaceAll("%owner_id%", String(playlist.owner.id));
 	foldername = foldername.replaceAll("%year%", playlist.date.year);
 	foldername = foldername.replaceAll("%date%", playlist.dateString);
 	foldername = foldername.replaceAll(

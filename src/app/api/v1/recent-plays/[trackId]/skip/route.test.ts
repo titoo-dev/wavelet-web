@@ -28,7 +28,7 @@ beforeEach(() => {
 	resetPrismaMock();
 	clearSession();
 	libraryMock.maybeEvictFile.mockReset();
-	libraryMock.maybeEvictFile.mockResolvedValue(undefined as any);
+	libraryMock.maybeEvictFile.mockResolvedValue(undefined);
 	libraryMock.getTrackRefCount.mockReset();
 });
 
@@ -45,7 +45,7 @@ describe("POST /api/v1/recent-plays/[trackId]/skip", () => {
 
 	it("returns kept=true reason=already_played when user has played the track before", async () => {
 		setSessionUser("u1");
-		prismaMock.recentPlay.findUnique.mockResolvedValue({ id: "rp1" } as any);
+		prismaMock.recentPlay.findUnique.mockResolvedValue({ id: "rp1" });
 
 		const res = await POST(
 			makeNextRequest({ method: "POST" }),
@@ -63,7 +63,7 @@ describe("POST /api/v1/recent-plays/[trackId]/skip", () => {
 	it("returns kept=true reason=anchored when other refs exist", async () => {
 		setSessionUser("u1");
 		prismaMock.recentPlay.findUnique.mockResolvedValue(null);
-		libraryMock.getTrackRefCount.mockResolvedValue({ total: 3 } as any);
+		libraryMock.getTrackRefCount.mockResolvedValue({ total: 3 });
 
 		const res = await POST(
 			makeNextRequest({ method: "POST" }),
@@ -80,7 +80,7 @@ describe("POST /api/v1/recent-plays/[trackId]/skip", () => {
 	it("evicts the file when no prior play and no anchors", async () => {
 		setSessionUser("u1");
 		prismaMock.recentPlay.findUnique.mockResolvedValue(null);
-		libraryMock.getTrackRefCount.mockResolvedValue({ total: 0 } as any);
+		libraryMock.getTrackRefCount.mockResolvedValue({ total: 0 });
 
 		const res = await POST(
 			makeNextRequest({ method: "POST" }),
@@ -108,7 +108,7 @@ describe("POST /api/v1/recent-plays/[trackId]/skip", () => {
 
 	it("queries with the correct composite key", async () => {
 		setSessionUser("u1");
-		prismaMock.recentPlay.findUnique.mockResolvedValue({ id: "rp1" } as any);
+		prismaMock.recentPlay.findUnique.mockResolvedValue({ id: "rp1" });
 
 		await POST(
 			makeNextRequest({ method: "POST" }),
@@ -153,7 +153,7 @@ describe("POST /api/v1/recent-plays/[trackId]/skip", () => {
 	it("returns 500 INTERNAL_ERROR when maybeEvictFile throws", async () => {
 		setSessionUser("u1");
 		prismaMock.recentPlay.findUnique.mockResolvedValue(null);
-		libraryMock.getTrackRefCount.mockResolvedValue({ total: 0 } as any);
+		libraryMock.getTrackRefCount.mockResolvedValue({ total: 0 });
 		libraryMock.maybeEvictFile.mockRejectedValue(new Error("disk fail"));
 
 		const res = await POST(

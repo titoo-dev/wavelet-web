@@ -2,6 +2,13 @@ import { NextRequest } from "next/server";
 import { clean_search_query } from "@/lib/deezer/utils";
 import { ok, fail, handleError, getGuestOrUserDz } from "../../_lib/helpers";
 
+type Row = Record<string, unknown>;
+/** A section of the gw pageSearch answer. */
+type Section = { data?: Row[]; count?: number };
+type PageSearch = { TRACK?: Section; ALBUM?: Section; ARTIST?: Section; [key: string]: unknown };
+/** A public API search page. */
+type ApiPage = { data?: Row[] } | null | undefined;
+
 export async function GET(request: NextRequest) {
 	try {
 		const { dz } = await getGuestOrUserDz(request);
@@ -21,17 +28,17 @@ export async function GET(request: NextRequest) {
 				dz.api.search_artist(term, { limit: 50 }),
 			]);
 
-		const gw =
-			gwResults.status === "fulfilled" ? gwResults.value : ({} as any);
-		const merged = { ...gw };
+		const gw: PageSearch =
+			gwResults.status === "fulfilled" ? gwResults.value : {};
+		const merged: PageSearch = { ...gw };
 
 		if (apiTracks.status === "fulfilled") {
-			const apiData = (apiTracks.value as any)?.data || [];
+			const apiData = (apiTracks.value as ApiPage)?.data || [];
 			const existingIds = new Set(
-				(merged.TRACK?.data || []).map((t: any) => String(t.SNG_ID))
+				(merged.TRACK?.data || []).map((t) => String(t.SNG_ID))
 			);
 			const newTracks = apiData.filter(
-				(t: any) => !existingIds.has(String(t.id))
+				(t) => !existingIds.has(String(t.id))
 			);
 			if (newTracks.length > 0) {
 				merged.TRACK = merged.TRACK || { data: [], count: 0 };
@@ -41,12 +48,12 @@ export async function GET(request: NextRequest) {
 		}
 
 		if (apiAlbums.status === "fulfilled") {
-			const apiData = (apiAlbums.value as any)?.data || [];
+			const apiData = (apiAlbums.value as ApiPage)?.data || [];
 			const existingIds = new Set(
-				(merged.ALBUM?.data || []).map((a: any) => String(a.ALB_ID))
+				(merged.ALBUM?.data || []).map((a) => String(a.ALB_ID))
 			);
 			const newAlbums = apiData.filter(
-				(a: any) => !existingIds.has(String(a.id))
+				(a) => !existingIds.has(String(a.id))
 			);
 			if (newAlbums.length > 0) {
 				merged.ALBUM = merged.ALBUM || { data: [], count: 0 };
@@ -56,12 +63,12 @@ export async function GET(request: NextRequest) {
 		}
 
 		if (apiArtists.status === "fulfilled") {
-			const apiData = (apiArtists.value as any)?.data || [];
+			const apiData = (apiArtists.value as ApiPage)?.data || [];
 			const existingIds = new Set(
-				(merged.ARTIST?.data || []).map((a: any) => String(a.ART_ID))
+				(merged.ARTIST?.data || []).map((a) => String(a.ART_ID))
 			);
 			const newArtists = apiData.filter(
-				(a: any) => !existingIds.has(String(a.id))
+				(a) => !existingIds.has(String(a.id))
 			);
 			if (newArtists.length > 0) {
 				merged.ARTIST = merged.ARTIST || { data: [], count: 0 };

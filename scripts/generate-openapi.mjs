@@ -1415,6 +1415,27 @@ const paths = {
 			"x-error-codes": ["INVALID_BODY", "NOT_FOUND", "UPSTREAM_ERROR", "NO_DEEZER"],
 		},
 	},
+	"/api/v1/tracks/{trackId}/radio": {
+		parameters: [pathParam("trackId", "Deezer track id")],
+		get: {
+			tags: ["Listens"],
+			operationId: "getTrackRadio",
+			summary: "The track's radio: songs similar to it",
+			description:
+				"ListenBrainz / Last.fm tracks similar to this one (found back on Deezer) lead, Deezer's radio of its artist fills in. Leaves out the track itself, what this user skips early more often than they listen to it, the artists they skipped early 3 times and never listened to, and anything played in the last 3 hours; at most 2 tracks per artist, never one artist twice in a row when it can be helped. `seed` is the track as Deezer knows it. Play with `source: \"track-radio\"`.",
+			security: userAuth,
+			parameters: [query("limit", int({ minimum: 1, maximum: 50, default: 30 }), "Most tracks returned")],
+			responses: {
+				...okRes("TrackRadioEnvelope", obj({ seed: ref("AutoplayTrack"), tracks: arr(ref("AutoplayTrack")) }, ["seed", "tracks"])),
+				...E_400,
+				...E_404,
+				502: err("DeezerUpstreamError"),
+				503: err("NoDeezer"),
+				...E_USER,
+			},
+			"x-error-codes": ["INVALID_TRACK_ID", "INVALID_LIMIT", "NOT_FOUND", "UPSTREAM_ERROR", "NO_DEEZER"],
+		},
+	},
 
 	// ─── Daily Mix ───
 	"/api/v1/mixes/daily": {

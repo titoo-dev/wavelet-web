@@ -188,7 +188,7 @@ export class Deezer {
 		}
 	}
 
-	changeAccount(child_n) {
+	changeAccount(child_n): [User, number] {
 		if (this.childs.length - 1 < child_n) child_n = 0;
 		this.currentUser = this.childs[child_n];
 		this.selectedAccount = child_n;

@@ -72,7 +72,7 @@ const blobRow = {
 	bitrate: 320,
 	storagePath: "music/foo.mp3",
 	storageType: "r2",
-} as any;
+};
 
 
 function fakeBody() {

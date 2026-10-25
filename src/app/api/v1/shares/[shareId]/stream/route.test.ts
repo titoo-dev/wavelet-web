@@ -47,7 +47,7 @@ function share(storedTrackId: string | null = null) {
 		userId: "owner",
 		expiresAt: null,
 		storedTrackId,
-	} as any;
+	};
 }
 
 const blobStored = { id: "st1", trackId: "42", bitrate: 1, storagePath: "music/x.mp3", storageType: "r2" };
@@ -95,7 +95,7 @@ describe("GET /api/v1/shares/[shareId]/stream", () => {
 	beforeEach(() => {
 		resetPrismaMock();
 		vi.resetAllMocks();
-		prismaMock.sharedTrack.update.mockResolvedValue({} as any);
+		prismaMock.sharedTrack.update.mockResolvedValue({});
 		prismaMock.storedTrack.findMany.mockResolvedValue([]);
 	});
 

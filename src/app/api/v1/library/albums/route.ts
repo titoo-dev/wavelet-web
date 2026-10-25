@@ -15,6 +15,16 @@ export async function GET(request: NextRequest) {
 	}
 }
 
+/** One track of the posted tracklist, as the client sends it. */
+interface AlbumTrackInput {
+	trackId: string | number;
+	title?: string;
+	artist?: string;
+	coverUrl?: string | null;
+	duration?: number | string | null;
+	trackNumber?: number | string | null;
+}
+
 // POST /api/v1/library/albums — save an album (with its tracklist)
 export async function POST(request: NextRequest) {
 	try {
@@ -46,7 +56,7 @@ export async function POST(request: NextRequest) {
 					artist: body.artist,
 					coverUrl: body.coverUrl ?? null,
 				},
-				body.tracks.map((t: any) => ({
+				body.tracks.map((t: AlbumTrackInput) => ({
 					trackId: String(t.trackId),
 					title: String(t.title || ""),
 					artist: String(t.artist || ""),

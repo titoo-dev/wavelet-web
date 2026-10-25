@@ -3,18 +3,19 @@
 
 import type { Listener } from "@/lib/wavelet/types/listener";
 import type { Deezer } from "@/lib/deezer";
+import type { WaveletApp } from "@/lib/wavelet-app";
 
 // ── Per-user Deezer session with TTL eviction ──
 
 interface DzSession {
-	dz: any;
+	dz: Deezer;
 	lastAccess: number;
 }
 
 const SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 const globalForWavelet = globalThis as unknown as {
-	waveletApp: any;
+	waveletApp: WaveletApp | null;
 	sessionDZ: Map<string, DzSession>;
 	guestSession?: { dz: Deezer; loggedInAt: number };
 	guestLogin?: Promise<Deezer | null>;
@@ -30,7 +31,7 @@ export function getSessionDZ(): Map<string, DzSession> {
 }
 
 /** Retrieve the Deezer instance for a specific user, refreshing TTL */
-export function getUserDz(userId: string): any | null {
+export function getUserDz(userId: string): Deezer | null {
 	const sessions = getSessionDZ();
 	const entry = sessions.get(userId);
 	if (!entry) return null;
@@ -39,7 +40,7 @@ export function getUserDz(userId: string): any | null {
 }
 
 /** Store a Deezer instance for a specific user */
-export function setUserDz(userId: string, dz: any): void {
+export function setUserDz(userId: string, dz: Deezer): void {
 	const sessions = getSessionDZ();
 	sessions.set(userId, { dz, lastAccess: Date.now() });
 	evictStaleSessions();
@@ -57,7 +58,7 @@ export function removeUserDz(userId: string): void {
  * Used by routes that act on behalf of a user (e.g. public share playback
  * falling back to progressive re-stream with the share creator's ARL).
  */
-export async function getOrLoginUserDz(userId: string): Promise<any | null> {
+export async function getOrLoginUserDz(userId: string): Promise<Deezer | null> {
 	const cached = getUserDz(userId);
 	if (cached?.loggedIn) return cached;
 
@@ -74,7 +75,7 @@ export async function getOrLoginUserDz(userId: string): Promise<any | null> {
 export const GUEST_SESSION_TTL_MS = 30 * 60 * 1000;
 
 /** Get or create a shared guest Deezer session (for browsing without auth) */
-export async function getGuestDz(): Promise<any | null> {
+export async function getGuestDz(): Promise<Deezer | null> {
 	const current = globalForWavelet.guestSession;
 	if (current?.dz?.loggedIn && Date.now() - current.loggedInAt < GUEST_SESSION_TTL_MS) {
 		return current.dz;
@@ -121,10 +122,10 @@ function evictStaleSessions() {
 
 // ── WaveletApp singleton ──
 
-let _waveletApp: any = null;
-let _initPromise: Promise<any> | null = null;
+let _waveletApp: WaveletApp | null = null;
+let _initPromise: Promise<WaveletApp | null> | null = null;
 
-export async function getWaveletApp() {
+export async function getWaveletApp(): Promise<WaveletApp | null> {
 	if (_waveletApp) return _waveletApp;
 	if (!_initPromise) {
 		_initPromise = initializeWaveletApp().then((app) => {
