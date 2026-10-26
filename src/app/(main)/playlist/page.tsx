@@ -7,6 +7,7 @@ import { Clock3, ListMusic, Music2 } from "lucide-react";
 import { TrackRow, trackFromDeezerRaw, type TrackRowTrack } from "@/components/tracks/TrackRow";
 import { useTracklist } from "@/components/collection/useTracklist";
 import { LoadFailed } from "@/components/collection/LoadFailed";
+import { NoMatches, TrackFilter, useTrackFilter } from "@/components/collection/TrackFilter";
 import { PlaylistDetailSkeleton } from "@/components/skeletons";
 import { AddTracksToPlaylist, DownloadCollectionButton, useCollectionPlayback } from "@/components/collection/CollectionActions";
 import { CollectionScaffold, Medallion, swap } from "@/components/expressive";
@@ -45,6 +46,9 @@ function PlaylistView({ page }: { page: PlaylistPageData }) {
 	const tracks = useMemo<TrackRowTrack[]>(() => page.tracks.map((t) => trackFromDeezerRaw(t)), [page]);
 	const covers = useMemo(() => trackCovers(tracks.map((t) => t.cover)), [tracks]);
 	const { play, shuffle, trackIds } = useCollectionPlayback(tracks);
+	const filter = useTrackFilter();
+	const { active, match } = filter;
+	const shown = useMemo(() => (active ? tracks.filter(match) : tracks), [tracks, active, match]);
 
 	const stats = [
 		{ icon: Music2, label: plural(tracks.length, "track") },
@@ -72,13 +76,16 @@ function PlaylistView({ page }: { page: PlaylistPageData }) {
 			}
 		>
 			<section aria-label="Tracklist" className="mt-6">
+				{tracks.length > 1 && <TrackFilter value={filter.query} onChange={filter.setQuery} className="mb-2" />}
 				{tracks.length === 0 ? (
 					<Medallion icon={ListMusic} title="This playlist is empty" />
+				) : shown.length === 0 ? (
+					<NoMatches query={filter.searched} />
 				) : (
 					<VirtualRows
 						className="-mx-2"
 						gap={2}
-						items={tracks}
+						items={shown}
 						getKey={(t, i) => `${t.trackId}-${i}`}
 						render={(t) => (
 							<motion.div {...rowReveal}>

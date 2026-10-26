@@ -19,6 +19,7 @@ import { useLoginHref } from "@/hooks/useLoginHref";
 import { trailingSend } from "@/lib/trailing-send";
 import { DeletePlaylistDialog, PlaylistEditDialog, filledButton, tonalButton } from "@/components/playlists/PlaylistDialogs";
 import { PlaylistDetailSkeleton } from "@/components/playlists/PlaylistTiles";
+import { NoMatches, TrackFilter, useTrackFilter } from "@/components/collection/TrackFilter";
 import { formatRelative, formatTotal, plural, uniqueCovers } from "@/components/playlists/format";
 
 interface PlaylistTrack {
@@ -60,6 +61,7 @@ export default function PlaylistDetailPage() {
 	const stopPlayer = usePlayerStore((s) => s.stop);
 	const playerPlay = usePlayerStore((s) => s.play);
 	const toggleShuffle = usePlayerStore((s) => s.toggleShuffle);
+	const filter = useTrackFilter();
 
 	// Background prefetch: warm IndexedDB for the first tracks so playback starts instantly
 	const allTrackIds = playlist?.tracks.map((t) => t.trackId) || [];
@@ -276,10 +278,15 @@ export default function PlaylistDetailPage() {
 		bitrateLabel: null,
 	}));
 
+	// Searching shows a subset; numbers stay the tracks' places in the playlist.
+	const rows = sortedTracks.map((track, i) => ({ track, row: normalized[i], number: i + 1 })).filter((r) => !filter.active || filter.match(r.track));
+
 	// Drag-reorder is only correct when the display order matches the stored
-	// position order (i.e. ascending). In "newest first" mode, dragging would
-	// invert positions on save — disable until the user flips back to "asc".
-	const reorderEnabled = sortOrder === "asc" && sortedTracks.length > 1;
+	// position order (i.e. ascending) and every track is shown. In "newest
+	// first" mode, dragging would invert positions on save — disable until the
+	// user flips back to "asc" and clears the search.
+	const reorderEnabled = sortOrder === "asc" && sortedTracks.length > 1 && !filter.active;
+	const hint = filter.active ? "search" : reorderEnabled ? "drag" : sortedTracks.length > 1 ? "sort" : "few";
 	const allCovers = uniqueCovers([[...playlist.tracks].sort((a, b) => a.position - b.position).map((t) => t.coverUrl)], 40);
 	const seconds = playlist.tracks.reduce((s, t) => s + (t.duration ?? 0), 0);
 	const updated = formatRelative(playlist.updatedAt);
@@ -346,18 +353,25 @@ export default function PlaylistDetailPage() {
 						</motion.div>
 					) : (
 						<motion.div key="list" variants={swap} initial="initial" animate="animate" exit="exit" className="mt-4">
-							<div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+							<div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+								{sortedTracks.length > 1 && <TrackFilter value={filter.query} onChange={filter.setQuery} />}
 								<AnimatePresence mode="wait" initial={false}>
 									<motion.p
-										key={String(reorderEnabled)}
+										key={hint}
 										initial={{ opacity: 0, y: 6 }}
 										animate={{ opacity: 1, y: 0 }}
 										exit={{ opacity: 0, y: -6 }}
 										transition={{ duration: 0.2 }}
-										className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"
+										className="mr-auto flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"
 									>
-										{reorderEnabled ? <GripVertical className="size-4 shrink-0 text-primary" /> : <ArrowDownUp className="size-4 shrink-0 text-primary" />}
-										{reorderEnabled ? "Drag the handle to reorder" : sortedTracks.length > 1 ? "Switch to Oldest to reorder" : "Add more tracks to reorder"}
+										{hint === "drag" ? <GripVertical className="size-4 shrink-0 text-primary" /> : <ArrowDownUp className="size-4 shrink-0 text-primary" />}
+										{hint === "search"
+											? "Clear the search to reorder"
+											: hint === "drag"
+												? "Drag the handle to reorder"
+												: hint === "sort"
+													? "Switch to Oldest to reorder"
+													: "Add more tracks to reorder"}
 									</motion.p>
 								</AnimatePresence>
 								{sortedTracks.length > 1 && (
@@ -374,7 +388,11 @@ export default function PlaylistDetailPage() {
 									/>
 								)}
 							</div>
-							<PlaylistTrackList tracks={sortedTracks} normalized={normalized} onReorder={handleReorder} onRemove={handleRemoveTrack} canDrag={reorderEnabled} />
+							{rows.length === 0 ? (
+								<NoMatches query={filter.searched} />
+							) : (
+								<PlaylistTrackList rows={rows} queue={normalized} onReorder={handleReorder} onRemove={handleRemoveTrack} canDrag={reorderEnabled} />
+							)}
 						</motion.div>
 					)}
 				</AnimatePresence>
@@ -390,22 +408,24 @@ export default function PlaylistDetailPage() {
  *  Reorder swaps within the full `values`, so dragging among the mounted
  *  rows keeps the unmounted ones in place. */
 function PlaylistTrackList({
-	tracks,
-	normalized,
+	rows: items,
+	queue,
 	onReorder,
 	onRemove,
 	canDrag,
 }: {
-	tracks: PlaylistTrack[];
-	normalized: TrackRowTrack[];
+	/** The tracks shown (all of them, or the search results), with their place in the playlist. */
+	rows: { track: PlaylistTrack; row: TrackRowTrack; number: number }[];
+	/** The whole playlist, played from the tapped track. */
+	queue: TrackRowTrack[];
 	onReorder: (trackIds: string[]) => void;
 	onRemove: (trackId: string) => void;
 	canDrag: boolean;
 }) {
 	const { listRef, rows, measureRef, style } = useWindowRows({
-		count: tracks.length,
+		count: items.length,
 		estimateSize: () => 60,
-		getItemKey: (i) => tracks[i].id,
+		getItemKey: (i) => items[i].track.id,
 		gap: 2,
 	});
 
@@ -414,20 +434,21 @@ function PlaylistTrackList({
 			ref={listRef}
 			as="div"
 			axis="y"
-			values={tracks.map((t) => t.trackId)}
+			values={items.map((r) => r.track.trackId)}
 			onReorder={onReorder}
 			className="-mx-2 space-y-0.5"
 			style={style}
 		>
 			{rows.map(({ index }) => (
 				<DraggableRow
-					key={tracks[index].id}
+					key={items[index].track.id}
 					measureRef={measureRef}
-					trackId={tracks[index].trackId}
+					trackId={items[index].track.trackId}
 					idx={index}
-					normalized={normalized[index]}
-					queue={normalized}
-					onDelete={() => onRemove(tracks[index].trackId)}
+					number={items[index].number}
+					normalized={items[index].row}
+					queue={queue}
+					onDelete={() => onRemove(items[index].track.trackId)}
 					canDrag={canDrag}
 				/>
 			))}
@@ -443,6 +464,7 @@ function DraggableRow({
 	measureRef,
 	trackId,
 	idx,
+	number,
 	normalized,
 	queue,
 	onDelete,
@@ -451,6 +473,7 @@ function DraggableRow({
 	measureRef?: (el: Element | null) => void;
 	trackId: string;
 	idx: number;
+	number: number;
 	normalized: TrackRowTrack;
 	queue: TrackRowTrack[];
 	onDelete: () => void;
@@ -474,7 +497,7 @@ function DraggableRow({
 				{canDrag && (
 					<motion.button
 						type="button"
-						aria-label={`Drag to reorder track ${idx + 1}`}
+						aria-label={`Drag to reorder track ${number}`}
 						initial={{ width: 0, opacity: 0 }}
 						animate={{ width: "auto", opacity: 1 }}
 						exit={{ width: 0, opacity: 0 }}
@@ -492,7 +515,7 @@ function DraggableRow({
 				)}
 			</AnimatePresence>
 			<div className="min-w-0 flex-1">
-				<TrackRow track={normalized} trackNumber={idx + 1} showBitrate={false} showDuration onDelete={onDelete} queue={queue} />
+				<TrackRow track={normalized} trackNumber={number}showBitrate={false} showDuration onDelete={onDelete} queue={queue} />
 			</div>
 		</Reorder.Item>
 	);
