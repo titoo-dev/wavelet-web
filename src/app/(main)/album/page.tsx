@@ -11,6 +11,7 @@ import { TrackRow, trackFromDeezerRaw, type TrackRowTrack } from "@/components/t
 import { MediaCard } from "@/components/cards/MediaCard";
 import { useTracklist } from "@/components/collection/useTracklist";
 import { LoadFailed } from "@/components/collection/LoadFailed";
+import { NoMatches, TrackFilter, useTrackFilter } from "@/components/collection/TrackFilter";
 import { AlbumDetailSkeleton } from "@/components/skeletons";
 import { AddTracksToPlaylist, DownloadCollectionButton, useCollectionPlayback } from "@/components/collection/CollectionActions";
 import { CardCarousel, CollectionScaffold, Medallion, SPRING, SavedBadge, SectionTitle, TonalIconButton, swap } from "@/components/expressive";
@@ -117,7 +118,9 @@ function AlbumView({ page }: { page: AlbumPageData }) {
 	const saved = isSaved(page.id);
 
 	const tracks = useMemo<TrackRowTrack[]>(() => page.tracks.map((t) => trackFromDeezerRaw(t)), [page]);
-	const rows = useMemo(() => albumRows(page.discs), [page]);
+	const filter = useTrackFilter();
+	const { active, match } = filter;
+	const rows = useMemo(() => albumRows(page.discs, active ? (i) => match(tracks[i]) : undefined), [page, tracks, active, match]);
 	const { play, shuffle, trackIds } = useCollectionPlayback(tracks);
 
 	const toggleSave = async () => {
@@ -182,8 +185,11 @@ function AlbumView({ page }: { page: AlbumPageData }) {
 		>
 			<div className="mt-6 grid items-start gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,1fr)_320px]">
 				<section aria-label="Tracklist" className="min-w-0">
+					{tracks.length > 1 && <TrackFilter value={filter.query} onChange={filter.setQuery} placeholder="Search in album" className="mb-2" />}
 					{tracks.length === 0 ? (
 						<Medallion icon={Disc3} title="No tracks" message="The tracklist for this album is unavailable." />
+					) : rows.length === 0 ? (
+						<NoMatches query={filter.searched} />
 					) : (
 						<VirtualRows
 							className="-mx-2"

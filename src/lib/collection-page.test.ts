@@ -165,6 +165,14 @@ describe("albumRows", () => {
 			{ kind: "track", index: 2 },
 		]);
 	});
+
+	it("keeps only the searched tracks, and the headers of their discs", () => {
+		expect(albumRows([1, 1, 2, 2], (i) => i === 3)).toEqual([
+			{ kind: "disc", disc: 2 },
+			{ kind: "track", index: 3 },
+		]);
+		expect(albumRows([1, 2], () => false)).toEqual([]);
+	});
 });
 
 describe("parseArtistPage", () => {

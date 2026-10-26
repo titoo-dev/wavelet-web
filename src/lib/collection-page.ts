@@ -193,11 +193,15 @@ export function parseAlbumPage(data: unknown, fallbackId = ""): AlbumPageData | 
 export type AlbumRow = { kind: "disc"; disc: number } | { kind: "track"; index: number };
 
 /** Tracks interleaved with "Disc N" headers when the album spans discs. */
-export function albumRows(discs: number[]): AlbumRow[] {
+export function albumRows(discs: number[], keep: (index: number) => boolean = () => true): AlbumRow[] {
 	const multi = new Set(discs).size > 1;
 	const rows: AlbumRow[] = [];
+	let last: number | null = null;
 	discs.forEach((disc, i) => {
-		if (multi && (i === 0 || discs[i - 1] !== disc)) rows.push({ kind: "disc", disc });
+		if (!keep(i)) return;
+		// A disc keeps its header only while one of its tracks is shown.
+		if (multi && disc !== last) rows.push({ kind: "disc", disc });
+		last = disc;
 		rows.push({ kind: "track", index: i });
 	});
 	return rows;

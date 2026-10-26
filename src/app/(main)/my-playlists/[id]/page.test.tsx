@@ -50,6 +50,36 @@ describe("my-playlists/[id] — signed out", () => {
 	});
 });
 
+describe("my-playlists/[id] — search in playlist", () => {
+	const track = (n: number, title: string, artist: string) => ({ id: `pt${n}`, trackId: String(n), title, artist, album: null, albumId: null, coverUrl: null, duration: 200, position: n - 1 });
+	const MIX = { ...PLAYLIST, tracks: [track(1, "Crazy in Love", "Beyoncé"), track(2, "Get Lucky", "Daft Punk"), track(3, "Halo", "Beyoncé")] };
+
+	beforeEach(() => {
+		useAuthStore.setState({ isAuthenticated: true, isLoading: false });
+		vi.mocked(fetch).mockImplementation(async () => new Response(JSON.stringify({ success: true, data: MIX })));
+	});
+
+	it("shows only the matching tracks, numbered by their place, and pauses reordering", async () => {
+		render(<PlaylistDetailPage />);
+		await screen.findByText("Get Lucky");
+		expect(screen.getAllByRole("button", { name: /Drag to reorder/ })).toHaveLength(3);
+
+		await userEvent.type(screen.getByRole("searchbox", { name: "Search in playlist" }), "beyonce");
+		await waitFor(() => expect(screen.queryByText("Get Lucky")).toBeNull());
+		expect(screen.getByText("Crazy in Love")).toBeInTheDocument();
+		expect(screen.getByText("Halo")).toBeInTheDocument();
+		expect(screen.getByText("Clear the search to reorder")).toBeInTheDocument();
+		await waitFor(() => expect(screen.queryByRole("button", { name: /Drag to reorder/ })).toBeNull());
+	});
+
+	it("says so when nothing matches", async () => {
+		render(<PlaylistDetailPage />);
+		await screen.findByText("Get Lucky");
+		await userEvent.type(screen.getByRole("searchbox", { name: "Search in playlist" }), "zzz");
+		expect(await screen.findByText("No results for “zzz”")).toBeInTheDocument();
+	});
+});
+
 describe("my-playlists/[id] — delete (NAV-14)", () => {
 	it("replaces the deleted playlist in the history (was: Back opened 'Playlist not found')", async () => {
 		useAuthStore.setState({ isAuthenticated: true, isLoading: false });
