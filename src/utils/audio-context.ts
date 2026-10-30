@@ -3,7 +3,7 @@
  * AudioVisualizer and useAudioLevel.
  *
  *   element → MediaElementSource → meter (Analyser) → norm (Gain) → volume (Gain)
- *     → shared Analyser (visualiser) → destination
+ *     → bus (Gain) → [sound effects] → shared Analyser (visualiser) → destination
  *
  * • The AudioContext is created / resumed from a user gesture only
  *   (installGestureUnlock): iOS keeps a context created elsewhere suspended
@@ -18,7 +18,13 @@
  *   element starts at unity, never with the previous track's gain.
  * • releaseElement() disconnects a discarded element's nodes (was: one
  *   MediaElementSource per element, never disconnected).
+ * • Sound effects (sound-graph.ts) sit between the bus and the analyser,
+ *   shared by every element, so a crossfade runs through the same chain.
+ *   All off = the bus feeds the analyser directly.
  */
+
+import { DEFAULT_SOUND, type SoundSettings } from "@/components/audio/engine/sound";
+import { buildSoundChain, type SoundChain } from "./sound-graph";
 
 type AudioContextCtor = new () => AudioContext;
 
@@ -35,6 +41,9 @@ export const NORM_MAX_GAIN = 2;
 
 let _ctx: AudioContext | null = null;
 let _analyser: AnalyserNode | null = null;
+let _bus: GainNode | null = null;
+let _sound: SoundSettings = DEFAULT_SOUND;
+let _chain: SoundChain | null = null;
 let _routes = new WeakMap<HTMLAudioElement, Route>();
 let _failed = new WeakSet<HTMLAudioElement>(); // CORS or duplicate-source failures
 let _volumes = new WeakMap<HTMLAudioElement, number>();
@@ -56,6 +65,9 @@ export function __setAudioContextFactory(factory?: () => AudioContext | null) {
 	_factory = factory ?? defaultFactory;
 	_ctx = null;
 	_analyser = null;
+	_bus = null;
+	_sound = DEFAULT_SOUND;
+	_chain = null;
 	_routes = new WeakMap();
 	_failed = new WeakSet();
 	_volumes = new WeakMap();
@@ -80,6 +92,8 @@ export function initAudioCtx(): boolean {
 		_analyser.fftSize = 256;
 		_analyser.smoothingTimeConstant = 0.8;
 		_analyser.connect(_ctx.destination);
+		_bus = _ctx.createGain();
+		applySound();
 		// Routed elements play through the context: if the system suspends
 		// it (iOS interruption, audio session change) try to get it back.
 		const ctx = _ctx;
@@ -119,7 +133,7 @@ export function installGestureUnlock(shouldCreate: () => boolean = () => true, t
  */
 export function routeElement(audio: HTMLAudioElement): boolean {
 	if (_routes.has(audio)) return true;
-	if (!_ctx || !_analyser || _ctx.state !== "running" || _failed.has(audio)) return false;
+	if (!_ctx || !_bus || _ctx.state !== "running" || _failed.has(audio)) return false;
 	try {
 		const source = _ctx.createMediaElementSource(audio);
 		const meter = _ctx.createAnalyser();
@@ -130,7 +144,7 @@ export function routeElement(audio: HTMLAudioElement): boolean {
 		source.connect(meter);
 		meter.connect(norm);
 		norm.connect(volume);
-		volume.connect(_analyser);
+		volume.connect(_bus);
 		_routes.set(audio, { source, meter, norm, volume });
 		try {
 			audio.volume = 1;
@@ -225,4 +239,44 @@ export function resetNormGain(audio: HTMLAudioElement | null): void {
 	const route = audio ? _routes.get(audio) : undefined;
 	if (!_ctx || !route) return;
 	route.norm.gain.setTargetAtTime(1, _ctx.currentTime, 0.3);
+}
+
+/**
+ * Apply the player's sound effects (sound-graph.ts). Remembered until the
+ * context exists, rebuilt on every change. A chain that fails to build (a
+ * browser without some node type) leaves the sound untouched.
+ */
+export function setSoundEffects(settings: SoundSettings): void {
+	_sound = settings;
+	applySound();
+}
+
+/** Whether effects sit in the graph right now (false when all off, or before the context). */
+export function isSoundChainActive(): boolean {
+	return _chain !== null;
+}
+
+function applySound(): void {
+	if (!_ctx || !_analyser || !_bus) return;
+	let chain: SoundChain | null;
+	try {
+		chain = buildSoundChain(_ctx, _sound);
+	} catch {
+		chain = null;
+	}
+	try {
+		_bus.disconnect();
+	} catch {}
+	if (chain) {
+		_bus.connect(chain.input);
+		chain.output.connect(_analyser);
+	} else {
+		_bus.connect(_analyser);
+	}
+	for (const node of _chain?.nodes ?? []) {
+		try {
+			node.disconnect();
+		} catch {}
+	}
+	_chain = chain;
 }

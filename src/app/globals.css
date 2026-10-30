@@ -540,6 +540,9 @@ html.dark .cover-theme {
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
+/* Equaliser band: a native range turned upright, maximum at the top. */
+.eq-slider { writing-mode: vertical-lr; direction: rtl; }
+
 ::selection {
 	background: color-mix(in srgb, var(--highlight) 25%, transparent);
 	color: var(--foreground);

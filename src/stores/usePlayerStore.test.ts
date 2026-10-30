@@ -6,6 +6,7 @@ import { usePlayerStore, type PlayerTrack } from "./usePlayerStore";
 import { setRemoteSender, setRemoteVolume } from "@/lib/playback-sync/remote";
 import { toSessionTrack } from "@/lib/playback-sync/track";
 import type { Command } from "@/lib/playback-sync/types";
+import { DEFAULT_SOUND, EQ_PRESETS } from "@/components/audio/engine/sound";
 
 const INITIAL = usePlayerStore.getState();
 
@@ -1006,5 +1007,45 @@ describe("usePlayerStore — autoplay", () => {
 		usePlayerStore.setState({ repeat: "off" });
 		setRemoteSender(() => {});
 		expect(usePlayerStore.getState().appendAutoplay(makeQueue(["c"]), "a")).toBe(0);
+	});
+});
+
+describe("usePlayerStore — sound effects", () => {
+	it("are all off by default", () => {
+		expect(usePlayerStore.getInitialState().sound).toEqual(DEFAULT_SOUND);
+	});
+
+	it("sets the spatial mode and the preset, and remembers them across reloads", () => {
+		usePlayerStore.getState().setSpatial("hall");
+		usePlayerStore.getState().setEqPreset("vocal");
+		expect(usePlayerStore.getState().sound).toMatchObject({ spatial: "hall", eqPreset: "vocal" });
+		const saved = JSON.parse(localStorage.getItem("wavelet-player") ?? "{}");
+		expect(saved.state.sound).toMatchObject({ spatial: "hall", eqPreset: "vocal" });
+	});
+
+	it("moving a band makes the curve custom, starting from the preset in effect", () => {
+		usePlayerStore.getState().setEqPreset("bass");
+		usePlayerStore.getState().setEqBand(9, 3);
+		const { sound } = usePlayerStore.getState();
+		expect(sound.eqPreset).toBe("custom");
+		expect(sound.eqCustom).toEqual([...EQ_PRESETS.bass.slice(0, 9), 3]);
+	});
+
+	it("clamps a band to ±12 dB and ignores a band that does not exist", () => {
+		usePlayerStore.getState().setEqBand(0, 40);
+		expect(usePlayerStore.getState().sound.eqCustom[0]).toBe(12);
+		const before = usePlayerStore.getState().sound;
+		usePlayerStore.getState().setEqBand(10, 3);
+		usePlayerStore.getState().setEqBand(-1, 3);
+		expect(usePlayerStore.getState().sound).toBe(before);
+	});
+
+	it("falls back to the defaults for broken sound settings in storage", async () => {
+		localStorage.setItem("wavelet-player", JSON.stringify({ state: { volume: 40, sound: { spatial: "cathedral", eqPreset: "custom", eqCustom: [3] } }, version: 0 }));
+		await usePlayerStore.persist.rehydrate();
+		const s = usePlayerStore.getState();
+		expect(s.volume).toBe(40);
+		expect(s.sound).toEqual({ spatial: "off", eqPreset: "custom", eqCustom: [3, 0, 0, 0, 0, 0, 0, 0, 0, 0] });
+		localStorage.removeItem("wavelet-player");
 	});
 });

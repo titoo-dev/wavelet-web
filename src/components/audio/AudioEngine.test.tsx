@@ -204,7 +204,13 @@ describe("AudioEngine — playback starts on every source", () => {
 
 describe("AudioEngine — Web Audio", () => {
 	it("never routes an element into a suspended AudioContext: it keeps element.volume (no silent playback)", async () => {
-		const ctx = { state: "suspended", resume: vi.fn(() => new Promise(() => {})), createAnalyser: vi.fn() };
+		const ctx = {
+			state: "suspended",
+			resume: vi.fn(() => new Promise(() => {})),
+			createAnalyser: vi.fn(),
+			// The bus the elements feed (sound effects sit after it).
+			createGain: vi.fn(() => ({ connect: vi.fn(), disconnect: vi.fn(), gain: { value: 1 } })),
+		};
 		ctx.createAnalyser.mockReturnValue({ connect: vi.fn(), fftSize: 0, smoothingTimeConstant: 0 });
 		__setAudioContextFactory(() => ctx as unknown as AudioContext);
 		initAudioCtx();

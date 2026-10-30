@@ -16,6 +16,7 @@ import {
 	routeElement,
 	setElementVolume,
 	setNormGain,
+	setSoundEffects,
 } from "@/utils/audio-context";
 import { createLoudnessMeter, type LoudnessMeter } from "@/components/audio/engine/loudness";
 import { startHandoff } from "@/components/audio/engine/handoff";
@@ -1093,6 +1094,13 @@ export function AudioEngine() {
 			normRef.current.appliedTo = null;
 		}
 	}, [normalizationEnabled]);
+
+	// Sound effects (spatialisation, equaliser): applied once the context
+	// exists, and again on every change.
+	const sound = usePlayerStore((s) => s.sound);
+	useEffect(() => {
+		setSoundEffects(sound);
+	}, [sound]);
 
 	// Retry: bumped by retryTrack() — reload the current track from scratch.
 	// We preserve the current playback position across the reload so the

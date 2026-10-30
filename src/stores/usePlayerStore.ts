@@ -4,6 +4,7 @@ import { haptic } from "@/utils/haptic";
 import { isRemote, muteToggleCommand, sendIfRemote } from "@/lib/playback-sync/remote";
 import { MAX_QUEUE, toSessionTrack, windowStartFor } from "@/lib/playback-sync/track";
 import type { Command } from "@/lib/playback-sync/types";
+import { DEFAULT_SOUND, EQ_BANDS, eqGains, normalizeSound, type EqPresetId, type SoundSettings, type SpatialMode } from "@/components/audio/engine/sound";
 
 export interface PlayerTrack {
 	trackId: string;
@@ -60,6 +61,8 @@ interface PlayerState {
 	// P2 features
 	crossfadeDuration: number;
 	normalizationEnabled: boolean;
+	/** Headphone spatialisation + equaliser of this device (engine/sound.ts); all off by default. */
+	sound: SoundSettings;
 	/** Sample-accurate transitions between cached MP3 tracks (MSE deck); off by default. Not with crossfade. */
 	gapless: boolean;
 	/** Similar tracks are added when the last track of the queue starts (useAutoplay); on by default. */
@@ -95,6 +98,10 @@ interface PlayerState {
 	playQueue: (queue: PlayerTrack[], startIndex?: number) => void;
 	setCrossfadeDuration: (seconds: number) => void;
 	toggleNormalization: () => void;
+	setSpatial: (mode: SpatialMode) => void;
+	setEqPreset: (preset: EqPresetId) => void;
+	/** Move one band (dB); the curve becomes the custom one, starting from the preset in effect. */
+	setEqBand: (band: number, db: number) => void;
 	toggleGapless: () => void;
 	toggleAutoplay: () => void;
 
@@ -181,6 +188,7 @@ export const usePlayerStore = create<PlayerState>()(
 			queuePanelOpen: false,
 			crossfadeDuration: 0,
 			normalizationEnabled: false,
+			sound: DEFAULT_SOUND,
 			gapless: false,
 			autoplay: true,
 
@@ -413,6 +421,15 @@ export const usePlayerStore = create<PlayerState>()(
 
 			setCrossfadeDuration: (crossfadeDuration) => set({ crossfadeDuration }),
 			toggleNormalization: () => set((s) => ({ normalizationEnabled: !s.normalizationEnabled })),
+			setSpatial: (spatial) => set((s) => ({ sound: { ...s.sound, spatial } })),
+			setEqPreset: (eqPreset) => set((s) => ({ sound: { ...s.sound, eqPreset } })),
+			setEqBand: (band, db) =>
+				set((s) => {
+					if (band < 0 || band >= EQ_BANDS.length) return {};
+					const eqCustom = eqGains(s.sound);
+					eqCustom[band] = db;
+					return { sound: normalizeSound({ ...s.sound, eqPreset: "custom", eqCustom }) };
+				}),
 			toggleGapless: () => set((s) => ({ gapless: !s.gapless })),
 			toggleAutoplay: () => set((s) => ({ autoplay: !s.autoplay })),
 			toggleRepeat: () => {
@@ -569,9 +586,15 @@ export const usePlayerStore = create<PlayerState>()(
 				currentTrack: state.currentTrack,
 				crossfadeDuration: state.crossfadeDuration,
 				normalizationEnabled: state.normalizationEnabled,
+				sound: state.sound,
 				gapless: state.gapless,
 				autoplay: state.autoplay,
 			}),
+			// Stored sound settings are checked: an unknown mode or a short curve falls back to the defaults.
+			merge: (persisted, current) => {
+				const p = (persisted ?? {}) as Partial<PlayerState>;
+				return { ...current, ...p, sound: normalizeSound(p.sound) };
+			},
 		}
 	)
 );
