@@ -14,8 +14,12 @@ import {
 	routeElement,
 	setElementVolume,
 	setNormGain,
+	setSoundEffects,
+	isSoundChainActive,
 } from "./audio-context";
 import { adjustVolume } from "./adjust-volume";
+import { DEFAULT_SOUND } from "@/components/audio/engine/sound";
+import { soundNodeFactories, type GraphNode, type SoundNodeFactories } from "@/test/helpers/fake-audio-graph";
 
 class FakeNode {
 	outputs: FakeNode[] = [];
@@ -282,5 +286,72 @@ describe("per-element normalisation", () => {
 		resetNormGain(a);
 		expect(normA.gain.value).toBe(1);
 		expect(readLevel(new Audio())).toBeNull();
+	});
+});
+
+describe("sound effects", () => {
+	/** The fake context with the node types the effects need. */
+	function withSoundNodes() {
+		// Keep the fake context's own gains (tracked in ctx.gains).
+		Object.assign(ctx, { ...soundNodeFactories(48000), createGain: ctx.createGain.bind(ctx) });
+	}
+
+	it("routes elements through a bus that feeds the analyser directly while every effect is off", async () => {
+		await running();
+		const audio = new Audio();
+		routeElement(audio);
+		const volume = ctx.gains.at(-1)!;
+		const bus = volume.outputs[0] as FakeGain;
+		expect(bus).toBeInstanceOf(FakeGain);
+		expect(bus.outputs).toEqual([getAnalyser()]);
+		expect(isSoundChainActive()).toBe(false);
+	});
+
+	it("applies settings chosen before the context exists once it is created", async () => {
+		withSoundNodes();
+		setSoundEffects({ ...DEFAULT_SOUND, spatial: "studio" });
+		expect(isSoundChainActive()).toBe(false);
+		await running();
+		expect(isSoundChainActive()).toBe(true);
+	});
+
+	it("puts the chain between the bus and the analyser, and takes it out again when turned off", async () => {
+		withSoundNodes();
+		await running();
+		const audio = new Audio();
+		routeElement(audio);
+		const bus = ctx.gains.at(-1)!.outputs[0] as FakeGain;
+
+		setSoundEffects({ ...DEFAULT_SOUND, eqPreset: "bass" });
+		expect(isSoundChainActive()).toBe(true);
+		const input = bus.outputs[0] as unknown as GraphNode;
+		expect(input).not.toBe(getAnalyser());
+		const limiter = (ctx as unknown as SoundNodeFactories).made.find((n) => n.kind === "compressor")!;
+		expect(limiter.next).toEqual([getAnalyser()]);
+
+		setSoundEffects(DEFAULT_SOUND);
+		expect(isSoundChainActive()).toBe(false);
+		expect(bus.outputs).toEqual([getAnalyser()]);
+		expect(limiter.disconnected).toBe(true);
+	});
+
+	it("disconnects the previous chain when the settings change", async () => {
+		withSoundNodes();
+		await running();
+		setSoundEffects({ ...DEFAULT_SOUND, spatial: "room" });
+		const first = (ctx as unknown as SoundNodeFactories).made.slice();
+		setSoundEffects({ ...DEFAULT_SOUND, spatial: "hall" });
+		expect(first.every((n) => n.disconnected)).toBe(true);
+		expect(isSoundChainActive()).toBe(true);
+	});
+
+	it("leaves the sound untouched when the browser lacks a node type", async () => {
+		await running(); // the plain fake context: no biquad, no convolver
+		const audio = new Audio();
+		routeElement(audio);
+		const bus = ctx.gains.at(-1)!.outputs[0] as FakeGain;
+		setSoundEffects({ ...DEFAULT_SOUND, spatial: "hall", eqPreset: "vocal" });
+		expect(isSoundChainActive()).toBe(false);
+		expect(bus.outputs).toEqual([getAnalyser()]);
 	});
 });

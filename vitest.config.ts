@@ -129,6 +129,7 @@ export default defineConfig({
 				"src/lib/audio-cache.ts",
 				"src/lib/prefetch-budget.ts",
 				"src/utils/audio-context.ts",
+				"src/utils/sound-graph.ts",
 				"src/utils/adjust-volume.ts",
 				"src/hooks/usePrefetch.ts",
 			],

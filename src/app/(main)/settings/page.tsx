@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SettingsSection, SettingsSwitchTile, SettingsTile, StatusPill } from "./_components/SettingsTiles";
 import { CrossfadeTile, DeezerAccountTile, QualityTile } from "./_components/PlaybackTiles";
 import { ShareLinksTile } from "./_components/ShareLinksTile";
+import { EqualizerTile, SpatialTile } from "./_components/SoundTiles";
 import { GuestHero, ProfileHero } from "./_components/SettingsHero";
 
 interface LibraryItem {
@@ -197,6 +198,11 @@ export default function SettingsPage() {
 							</div>
 
 							<div className="min-w-0">
+								<SettingsSection title="Sound" index={section++}>
+									<SpatialTile />
+									<EqualizerTile />
+								</SettingsSection>
+
 								<SettingsSection title="Appearance" index={section++}>
 									<div className="p-3">
 										<SlidingSegments
